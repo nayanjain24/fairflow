@@ -327,6 +327,11 @@ if __name__ == "__main__":
         recs = parse_csv_records(args.csv)
         metrics = compute_call_metrics(records=recs, total_sent=args.total_sent)
 
+        summary_payload = {
+            "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            **metrics,
+        }
+
         print("\n=== Idle Noise Floor Call Metrics Summary ===")
         print(f"Packets Sent:     {metrics['packets_sent']}")
         print(f"Packets Received: {metrics['packets_received']}")
@@ -338,5 +343,5 @@ if __name__ == "__main__":
 
         if args.out:
             with open(args.out, "w", encoding="utf-8") as f:
-                json.dump(metrics, f, indent=2)
+                json.dump(summary_payload, f, indent=2)
             print(f"Saved summary metrics to {args.out}")

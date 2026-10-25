@@ -23,16 +23,53 @@ from tests.conftest import MockCommandRunner
 
 
 def test_reject_non_ff_interface() -> None:
-    """Verifies that non-ff_* interfaces are strictly refused."""
+    """Verifies that non-ff_* interfaces and malformed names are strictly refused."""
+    # Disallowed prefixes
     for bad_name in ["eth0", "wlan0", "en0", "docker0", "lo", "veth0"]:
-        with pytest.raises(ValueError, match="Interface name must start with 'ff_'"):
+        with pytest.raises(ValueError, match="must match pattern"):
             validate_interface_name(bad_name)
+
+    # Disallowed characters / casing / empty suffix
+    for bad_pattern in ["ff_", "ff_WAN", "ff_eth-0", "ff_a.b", "ff_a@b"]:
+        with pytest.raises(ValueError, match="must match pattern"):
+            validate_interface_name(bad_pattern)
+
+    # Length > 15 chars (e.g. ff_ + 13 chars = 16 chars)
+    too_long = "ff_1234567890123"
+    assert len(too_long) == 16
+    with pytest.raises(ValueError, match="must match pattern"):
+        validate_interface_name(too_long)
+
+    # Non-string types
+    for bad_type in [None, 123, ["ff_eth0"]]:
+        with pytest.raises(TypeError, match="must be a string"):
+            validate_interface_name(bad_type)  # type: ignore[arg-type]
 
 
 def test_accept_ff_interface() -> None:
-    """Verifies that valid ff_* interface names pass validation."""
-    for valid_name in ["ff_wan", "ff_r_lan", "ff_s_wan", "ff_test0"]:
+    """Verifies that valid ff_* interface names (up to 15 chars) pass validation."""
+    valid_names = [
+        "ff_wan",
+        "ff_r_lan",
+        "ff_s_wan",
+        "ff_test0",
+        "ff_a_1_b",
+        "ff_123456789012",  # exactly 15 chars (ff_ + 12 chars)
+    ]
+    for valid_name in valid_names:
+        assert len(valid_name) <= 15
         assert validate_interface_name(valid_name) == valid_name
+
+
+def test_system_command_runner_enforces_argument_list_safety() -> None:
+    """Verifies SystemCommandRunner strictly enforces argument lists (no raw shell strings)."""
+    runner = SystemCommandRunner()
+
+    with pytest.raises(TypeError, match="cmd must be a list of strings"):
+        runner.run("echo dangerous; rm -rf /")  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="cmd must be a list of strings"):
+        runner.run([1, 2, 3])  # type: ignore[list-item]
 
 
 def test_tc_driver_refuses_non_ff_interface_on_all_operations(mock_runner: MockCommandRunner) -> None:
@@ -132,13 +169,15 @@ def test_real_integration_rollback_restores_identical_tc_json() -> None:
     Creates an isolated test namespace and veth pair named ff_test0 <-> ff_test1,
     applies Policy 1, captures 'tc -j qdisc show', applies Policy 2, rolls back to
     Policy 1, and verifies the resulting 'tc -j qdisc show' JSON is identical.
+
+    Fails loudly if not run as root on Linux with iproute2.
     """
     if sys.platform != "linux":
-        pytest.skip("Integration test requires Linux kernel (network namespaces and iproute2)")
+        pytest.fail("Integration test requires Linux kernel (network namespaces and iproute2)")
     if os.geteuid() != 0:
-        pytest.skip("Integration test requires root privileges for network namespace operations")
+        pytest.fail("Integration test requires root privileges for network namespace operations; run with sudo")
     if not shutil.which("ip") or not shutil.which("tc"):
-        pytest.skip("iproute2 tools (ip, tc) not found on PATH")
+        pytest.fail("iproute2 tools (ip, tc) not found on PATH")
 
     ns = "ff_integ_ns"
     veth_a = "ff_int_a"

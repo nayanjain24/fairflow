@@ -24,14 +24,16 @@ def validate_interface_name(interface: str) -> str:
     Outputs:
         Validated interface string.
     Failure handling:
-        Raises ValueError if interface does not start with 'ff_' or contains invalid characters.
+        Raises ValueError if interface does not match '^ff_[a-z0-9_]{1,12}$' (max 15 chars).
     Success condition:
         Returns interface string unmodified if valid.
     """
-    if not interface or not interface.startswith("ff_"):
-        raise ValueError(f"Interface name must start with 'ff_': {interface!r}")
-    if not re.match(r"^ff_[a-zA-Z0-9_-]+$", interface):
-        raise ValueError(f"Interface name contains invalid characters: {interface!r}")
+    if not isinstance(interface, str):
+        raise TypeError(f"Interface name must be a string, got {type(interface).__name__}")
+    if not re.match(r"^ff_[a-z0-9_]{1,12}$", interface):
+        raise ValueError(
+            f"Interface name must match pattern '^ff_[a-z0-9_]{{1,12}}$' (max 15 chars): {interface!r}"
+        )
     return interface
 
 
@@ -43,14 +45,16 @@ def validate_namespace_name(namespace: str) -> str:
     Outputs:
         Validated namespace string.
     Failure handling:
-        Raises ValueError if namespace does not start with 'ff_' or contains invalid characters.
+        Raises ValueError if namespace does not match '^ff_[a-z0-9_]{1,12}$' (max 15 chars).
     Success condition:
         Returns namespace string unmodified if valid.
     """
-    if not namespace or not namespace.startswith("ff_"):
-        raise ValueError(f"Namespace name must start with 'ff_': {namespace!r}")
-    if not re.match(r"^ff_[a-zA-Z0-9_-]+$", namespace):
-        raise ValueError(f"Namespace name contains invalid characters: {namespace!r}")
+    if not isinstance(namespace, str):
+        raise TypeError(f"Namespace name must be a string, got {type(namespace).__name__}")
+    if not re.match(r"^ff_[a-z0-9_]{1,12}$", namespace):
+        raise ValueError(
+            f"Namespace name must match pattern '^ff_[a-z0-9_]{{1,12}}$' (max 15 chars): {namespace!r}"
+        )
     return namespace
 
 
@@ -66,17 +70,21 @@ class SystemCommandRunner:
     """Default command runner invoking real system commands via subprocess."""
 
     def run(self, cmd: List[str], check: bool = True) -> tuple[str, str, int]:
-        """Execute command via subprocess.run.
+        """Execute command via subprocess.run using argument lists with shell=False.
 
         Inputs:
-            cmd: Command argument list.
+            cmd: Command argument list of strings.
             check: Whether to raise RuntimeError on non-zero exit code.
         Outputs:
             Tuple of (stdout_str, stderr_str, exit_code).
         Failure handling:
+            Raises TypeError if cmd is not a list of strings.
             Raises RuntimeError if check=True and process returns non-zero code.
         """
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if not isinstance(cmd, list) or not all(isinstance(arg, str) for arg in cmd):
+            raise TypeError(f"cmd must be a list of strings, got {cmd!r}")
+
+        proc = subprocess.run(cmd, capture_output=True, text=True, shell=False)
         if check and proc.returncode != 0:
             raise RuntimeError(
                 f"Command '{' '.join(cmd)}' failed with code {proc.returncode}: {proc.stderr.strip()}"

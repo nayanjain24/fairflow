@@ -14,7 +14,7 @@ PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
 DURATION="${1:-60}"
 RAW_CSV="${RESULTS_DIR}/idle_noise_floor_packets.csv"
 COUNT_FILE="${RESULTS_DIR}/idle_noise_floor_sent.txt"
-SUMMARY_JSON="${RESULTS_DIR}/idle_noise_floor_summary.json"
+SUMMARY_JSON="${RESULTS_DIR}/noise_floor_summary.json"
 
 mkdir -p "${RESULTS_DIR}"
 

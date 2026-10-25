@@ -28,7 +28,7 @@ def test_reject_scenario_with_non_ff_interface(mock_runner: MockCommandRunner) -
         },
     }
 
-    with pytest.raises(ValueError, match="Interface name must start with 'ff_'"):
+    with pytest.raises(ValueError, match="must match pattern"):
         ScenarioConfig.from_dict(bad_config)
 
 
@@ -40,7 +40,7 @@ def test_reject_scenario_with_non_ff_namespace(mock_runner: MockCommandRunner) -
         "links": {},
     }
 
-    with pytest.raises(ValueError, match="Namespace name must start with 'ff_'"):
+    with pytest.raises(ValueError, match="must match pattern"):
         ScenarioConfig.from_dict(bad_config)
 
 
@@ -106,13 +106,16 @@ def test_testbed_down_deletes_namespaces(mock_runner: MockCommandRunner) -> None
 
 @pytest.mark.integration
 def test_integration_testbed_up_then_down_is_clean() -> None:
-    """Integration test: create real namespaces and veths, then tear them down."""
+    """Integration test: create real namespaces and veths, verify end-to-end ping, then tear down.
+
+    Fails loudly if not run as root on Linux with iproute2.
+    """
     if sys.platform != "linux":
-        pytest.skip("Integration test requires Linux kernel")
+        pytest.fail("Integration test requires Linux kernel (network namespaces and iproute2)")
     if os.geteuid() != 0:
-        pytest.skip("Integration test requires root privileges")
+        pytest.fail("Integration test requires root privileges for network namespace operations; run with sudo")
     if not shutil.which("ip"):
-        pytest.skip("iproute2 'ip' command not found on PATH")
+        pytest.fail("iproute2 'ip' command not found on PATH")
 
     scenario_file = "experiments/idle_noise_floor.yaml"
     config = ScenarioConfig.from_yaml(scenario_file)
@@ -125,6 +128,13 @@ def test_integration_testbed_up_then_down_is_clean() -> None:
         assert "ff_client" in stdout
         assert "ff_router" in stdout
         assert "ff_server" in stdout
+
+        # Requirement 3: Verify end-to-end ping reachability between client and server through router
+        ping_cmd = ["ip", "netns", "exec", "ff_client", "ping", "-c", "3", "-W", "1", "10.0.2.2"]
+        stdout_ping, stderr_ping, code_ping = testbed.runner.run(ping_cmd, check=False)
+        assert code_ping == 0, f"Ping from ff_client to ff_server (10.0.2.2) failed (code {code_ping}): {stderr_ping}\n{stdout_ping}"
+        assert "0% packet loss" in stdout_ping or "3 received" in stdout_ping, f"Packet loss detected on ping: {stdout_ping}"
+
     finally:
         testbed.down()
         # Verify namespaces are removed

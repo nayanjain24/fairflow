@@ -1,0 +1,11 @@
+{
+  "timestamp_utc": "2026-10-25T17:53:53Z",
+  "packets_sent": 3001,
+  "packets_received": 3001,
+  "loss_count": 0,
+  "loss_pct": 0.0,
+  "p50_delay_ms": 0.167,
+  "p99_delay_ms": 0.66,
+  "mean_delay_ms": 0.22,
+  "jitter_ms": 0.157
+}

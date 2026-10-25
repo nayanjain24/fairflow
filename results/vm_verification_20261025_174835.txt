@@ -1,0 +1,226 @@
+FAIRFLOW VM VERIFICATION RUN
+Started at UTC: 2026-10-25T17:48:35Z
+Host: Darwin nayans-MacBook-Pro.local 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:05:48 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T6041 arm64
+
+======================================================================
+STEP: System versions
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh uname -a
+======================================================================
+Linux fairflow 6.8.0-147-generic #147-Ubuntu SMP PREEMPT_DYNAMIC Thu Sep 24 11:39:52 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+
+======================================================================
+STEP: tc version
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh tc -V
+======================================================================
+tc utility, iproute2-6.1.0, libbpf 1.3.0
+
+======================================================================
+STEP: python version
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh python --version
+======================================================================
+Python 3.12.3
+
+======================================================================
+STEP: iperf3 version
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh iperf3 --version
+======================================================================
+iperf 3.16 (cJSON 1.7.15)
+Linux fairflow 6.8.0-147-generic #147-Ubuntu SMP PREEMPT_DYNAMIC Thu Sep 24 11:39:52 UTC 2026 aarch64
+Optional features available: CPU affinity setting, IPv6 flow label, SCTP, TCP congestion algorithm setting, sendfile / zerocopy, socket pacing, authentication, bind to device, support IPv4 don't fragment, POSIX threads
+
+======================================================================
+STEP: pytest -q (unit tests)
+======================================================================
+....................                                                     [100%]
+20 passed, 2 deselected in 1.12s
+
+======================================================================
+STEP: Integration tests with sudo
+======================================================================
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.7.0 -- /home/ubuntu/venv-ff/bin/python
+cachedir: .pytest_cache
+rootdir: /home/ubuntu/fairflow
+configfile: pytest.ini
+collecting ... collected 22 items / 20 deselected / 2 selected
+
+tests/test_enforce.py::test_real_integration_rollback_restores_identical_tc_json PASSED [ 50%]
+tests/test_testbed.py::test_integration_testbed_up_then_down_is_clean PASSED [100%]
+
+======================= 2 passed, 20 deselected in 2.39s =======================
+
+======================================================================
+STEP: 00_check_env.sh
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh bash scripts/00_check_env.sh
+======================================================================
+=== Checking FairFlow Environment ===
+Python: /home/ubuntu/venv-ff/bin/python (3.12.3)
+pytest: 9.1.1
+pyyaml: 6.0.3
+tc:     /usr/sbin/tc (tc utility, iproute2-6.1.0, libbpf 1.3.0)
+ip:     /usr/sbin/ip (ip utility, iproute2-6.1.0, libbpf 1.3.0)
+iperf3: /usr/bin/iperf3 (iperf 3.16 (cJSON 1.7.15))
+netns_capable: true
+Recorded environment snapshot to /home/ubuntu/fairflow/results/env.json
+=== Environment Check Finished ===
+
+======================================================================
+STEP: cat results/env.json
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh cat results/env.json
+======================================================================
+{
+  "timestamp_utc": "2026-10-25T17:48:39Z",
+  "platform": {
+    "system": "Linux",
+    "release": "6.8.0-147-generic",
+    "machine": "aarch64",
+    "processor": "aarch64"
+  },
+  "python": {
+    "executable": "/home/ubuntu/venv-ff/bin/python",
+    "version": "3.12.3"
+  },
+  "packages": {
+    "pytest": "9.1.1",
+    "pyyaml": "6.0.3"
+  },
+  "system_tools": {
+    "tc": {
+      "path": "/usr/sbin/tc",
+      "version": "tc utility, iproute2-6.1.0, libbpf 1.3.0"
+    },
+    "ip": {
+      "path": "/usr/sbin/ip",
+      "version": "ip utility, iproute2-6.1.0, libbpf 1.3.0"
+    },
+    "iperf3": {
+      "path": "/usr/bin/iperf3",
+      "version": "iperf 3.16 (cJSON 1.7.15)"
+    }
+  },
+  "netns_capable": true
+}
+======================================================================
+STEP: Noise Floor Run 1/5
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh sudo bash scripts/run_idle_noise_floor.sh
+======================================================================
+=== Provisioning Emulated Testbed from /home/ubuntu/fairflow/experiments/idle_noise_floor.yaml ===
+=== Starting UDP Call Receiver in server namespace (ff_server) ===
+=== Starting UDP Call Sender in client namespace (ff_client) for 60s ===
+Sender finished. Transmitted 3001 packets.
+Receiver finished. Logged 3001 packets to /home/ubuntu/fairflow/results/idle_noise_floor_packets.csv
+=== Analyzing Raw CSV and Generating Summary ===
+
+=== Idle Noise Floor Call Metrics Summary ===
+Packets Sent:     3001
+Packets Received: 3001
+Packets Lost:     0 (0.0%)
+p50 Delay:        0.189 ms
+p99 Delay:        0.61 ms
+Mean Delay:       0.218 ms
+RFC 3550 Jitter:  0.136 ms
+Saved summary metrics to /home/ubuntu/fairflow/results/noise_floor_summary.json
+Saved timestamped run summary to /home/ubuntu/fairflow/results/noise_floor_20261025_174942.json
+=== Idle Noise Floor Run Complete ===
+=== Tearing Down Emulated Testbed ===
+
+======================================================================
+STEP: Noise Floor Run 2/5
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh sudo bash scripts/run_idle_noise_floor.sh
+======================================================================
+=== Provisioning Emulated Testbed from /home/ubuntu/fairflow/experiments/idle_noise_floor.yaml ===
+=== Starting UDP Call Receiver in server namespace (ff_server) ===
+=== Starting UDP Call Sender in client namespace (ff_client) for 60s ===
+Sender finished. Transmitted 3001 packets.
+Receiver finished. Logged 3001 packets to /home/ubuntu/fairflow/results/idle_noise_floor_packets.csv
+=== Analyzing Raw CSV and Generating Summary ===
+
+=== Idle Noise Floor Call Metrics Summary ===
+Packets Sent:     3001
+Packets Received: 3001
+Packets Lost:     0 (0.0%)
+p50 Delay:        0.218 ms
+p99 Delay:        0.821 ms
+Mean Delay:       0.254 ms
+RFC 3550 Jitter:  0.107 ms
+Saved summary metrics to /home/ubuntu/fairflow/results/noise_floor_summary.json
+Saved timestamped run summary to /home/ubuntu/fairflow/results/noise_floor_20261025_175045.json
+=== Idle Noise Floor Run Complete ===
+=== Tearing Down Emulated Testbed ===
+
+======================================================================
+STEP: Noise Floor Run 3/5
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh sudo bash scripts/run_idle_noise_floor.sh
+======================================================================
+=== Provisioning Emulated Testbed from /home/ubuntu/fairflow/experiments/idle_noise_floor.yaml ===
+=== Starting UDP Call Receiver in server namespace (ff_server) ===
+=== Starting UDP Call Sender in client namespace (ff_client) for 60s ===
+Sender finished. Transmitted 3001 packets.
+Receiver finished. Logged 3001 packets to /home/ubuntu/fairflow/results/idle_noise_floor_packets.csv
+=== Analyzing Raw CSV and Generating Summary ===
+
+=== Idle Noise Floor Call Metrics Summary ===
+Packets Sent:     3001
+Packets Received: 3001
+Packets Lost:     0 (0.0%)
+p50 Delay:        0.233 ms
+p99 Delay:        0.78 ms
+Mean Delay:       0.271 ms
+RFC 3550 Jitter:  0.065 ms
+Saved summary metrics to /home/ubuntu/fairflow/results/noise_floor_summary.json
+Saved timestamped run summary to /home/ubuntu/fairflow/results/noise_floor_20261025_175147.json
+=== Idle Noise Floor Run Complete ===
+=== Tearing Down Emulated Testbed ===
+
+======================================================================
+STEP: Noise Floor Run 4/5
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh sudo bash scripts/run_idle_noise_floor.sh
+======================================================================
+=== Provisioning Emulated Testbed from /home/ubuntu/fairflow/experiments/idle_noise_floor.yaml ===
+=== Starting UDP Call Receiver in server namespace (ff_server) ===
+=== Starting UDP Call Sender in client namespace (ff_client) for 60s ===
+Sender finished. Transmitted 3001 packets.
+Receiver finished. Logged 3001 packets to /home/ubuntu/fairflow/results/idle_noise_floor_packets.csv
+=== Analyzing Raw CSV and Generating Summary ===
+
+=== Idle Noise Floor Call Metrics Summary ===
+Packets Sent:     3001
+Packets Received: 3001
+Packets Lost:     0 (0.0%)
+p50 Delay:        0.207 ms
+p99 Delay:        0.681 ms
+Mean Delay:       0.245 ms
+RFC 3550 Jitter:  0.058 ms
+Saved summary metrics to /home/ubuntu/fairflow/results/noise_floor_summary.json
+Saved timestamped run summary to /home/ubuntu/fairflow/results/noise_floor_20261025_175250.json
+=== Idle Noise Floor Run Complete ===
+=== Tearing Down Emulated Testbed ===
+
+======================================================================
+STEP: Noise Floor Run 5/5
+COMMAND: /Users/nayanjain/fairflow/scripts/vm.sh sudo bash scripts/run_idle_noise_floor.sh
+======================================================================
+=== Provisioning Emulated Testbed from /home/ubuntu/fairflow/experiments/idle_noise_floor.yaml ===
+=== Starting UDP Call Receiver in server namespace (ff_server) ===
+=== Starting UDP Call Sender in client namespace (ff_client) for 60s ===
+Sender finished. Transmitted 3001 packets.
+Receiver finished. Logged 3001 packets to /home/ubuntu/fairflow/results/idle_noise_floor_packets.csv
+=== Analyzing Raw CSV and Generating Summary ===
+
+=== Idle Noise Floor Call Metrics Summary ===
+Packets Sent:     3001
+Packets Received: 3001
+Packets Lost:     0 (0.0%)
+p50 Delay:        0.167 ms
+p99 Delay:        0.66 ms
+Mean Delay:       0.22 ms
+RFC 3550 Jitter:  0.157 ms
+Saved summary metrics to /home/ubuntu/fairflow/results/noise_floor_summary.json
+Saved timestamped run summary to /home/ubuntu/fairflow/results/noise_floor_20261025_175353.json
+=== Idle Noise Floor Run Complete ===
+=== Tearing Down Emulated Testbed ===
+
+======================================================================
+All 5 noise floor runs completed successfully.
+Finished at UTC: 2026-10-25T17:53:53Z
+======================================================================

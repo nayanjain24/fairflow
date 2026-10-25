@@ -206,7 +206,8 @@ def test_real_integration_rollback_restores_identical_tc_json() -> None:
             link_capacity_mbps=20.0,
             classes={
                 "interactive": ClassPolicy(rate_floor_mbps=5.0, rate_ceiling_mbps=20.0, priority=1, leaf_qdisc="fq_codel"),
-                "bulk": ClassPolicy(rate_floor_mbps=2.0, rate_ceiling_mbps=20.0, priority=2, leaf_qdisc="fq_codel"),
+                "streaming": ClassPolicy(rate_floor_mbps=8.0, rate_ceiling_mbps=20.0, priority=2, leaf_qdisc="fq_codel"),
+                "bulk": ClassPolicy(rate_floor_mbps=2.0, rate_ceiling_mbps=20.0, priority=3, leaf_qdisc="fq_codel"),
             },
         )
 

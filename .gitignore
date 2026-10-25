@@ -52,5 +52,7 @@ htmlcov/
 *.pcap
 results/*.csv
 results/*.png
+results/*_sent.txt
 !results/.gitkeep
 !results/*.json
+!results/vm_verification_*.txt

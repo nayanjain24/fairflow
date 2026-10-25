@@ -165,7 +165,10 @@ class TCDriver:
         commands: List[List[str]] = []
         ns_prefix = ["ip", "netns", "exec", namespace]
 
-        # 1. Root HTB qdisc with default class id 30 (bulk)
+        # 1. Reset root qdisc to ensure clean tree replacement
+        commands.append(ns_prefix + ["tc", "qdisc", "del", "dev", interface, "root"])
+
+        # 2. Root HTB qdisc with default class id 30 (bulk)
         commands.append(
             ns_prefix
             + [
@@ -183,7 +186,7 @@ class TCDriver:
             ]
         )
 
-        # 2. Root HTB class shaped to link_capacity_mbps
+        # 3. Root HTB class shaped to link_capacity_mbps
         cap_rate = f"{policy.link_capacity_mbps:.1f}Mbit"
         commands.append(
             ns_prefix
@@ -205,7 +208,7 @@ class TCDriver:
             ]
         )
 
-        # 3. Per-class HTB classes and leaf qdiscs
+        # 4. Per-class HTB classes and leaf qdiscs
         for class_name, class_pol in policy.classes.items():
             class_id = self.CLASS_IDS.get(class_name, 99)
             floor_rate = f"{class_pol.rate_floor_mbps:.1f}Mbit"
@@ -253,7 +256,9 @@ class TCDriver:
             )
 
         if not self.dry_run:
-            for cmd in commands:
+            # Execute root qdisc deletion allowing it to fail gracefully if no qdisc exists
+            self.runner.run(commands[0], check=False)
+            for cmd in commands[1:]:
                 self.runner.run(cmd, check=True)
 
         return commands

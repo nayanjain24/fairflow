@@ -33,4 +33,15 @@ if [ "$#" -eq 0 ]; then
     exit 1
 fi
 
-exec multipass exec "${VM_NAME}" -- bash -lc 'cd ~/fairflow && source ~/venv-ff/bin/activate && "$@"' bash "$@"
+# Normalize any host-expanded paths (e.g. ~/venv-ff expanded by Mac shell to /Users/.../venv-ff)
+CMD_ARGS=()
+for arg in "$@"; do
+    if [[ "$arg" == *"/venv-ff/"* ]]; then
+        arg="/home/ubuntu/venv-ff/${arg#*/venv-ff/}"
+    elif [[ "$arg" == *"/venv-ff" ]]; then
+        arg="/home/ubuntu/venv-ff"
+    fi
+    CMD_ARGS+=("$arg")
+done
+
+exec multipass exec "${VM_NAME}" -- bash -lc 'cd ~/fairflow && source ~/venv-ff/bin/activate && "$@"' bash "${CMD_ARGS[@]}"

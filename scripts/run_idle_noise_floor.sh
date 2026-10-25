@@ -15,13 +15,13 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RESULTS_DIR="${REPO_ROOT}/results"
 SCENARIO_YAML="${REPO_ROOT}/experiments/idle_noise_floor.yaml"
 
-# Detect Python (prefer VM external venv ~/venv-ff, active VIRTUAL_ENV, or system)
-if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python" ]; then
-    PYTHON_BIN="${VIRTUAL_ENV}/bin/python"
+# Detect Python for the Ubuntu VM (prefer /home/ubuntu/venv-ff/bin/python)
+if [ -x "/home/ubuntu/venv-ff/bin/python" ]; then
+    PYTHON_BIN="/home/ubuntu/venv-ff/bin/python"
 elif [ -x "${HOME}/venv-ff/bin/python" ]; then
     PYTHON_BIN="${HOME}/venv-ff/bin/python"
-elif [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
-    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+elif [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python" ]; then
+    PYTHON_BIN="${VIRTUAL_ENV}/bin/python"
 elif command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="$(command -v python3)"
 else

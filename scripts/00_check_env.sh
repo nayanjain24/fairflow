@@ -19,12 +19,12 @@ mkdir -p "${RESULTS_DIR}"
 echo "=== Checking FairFlow Environment ==="
 
 # 1. Check Python
-if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python" ]; then
-    PYTHON_BIN="${VIRTUAL_ENV}/bin/python"
+if [ -x "/home/ubuntu/venv-ff/bin/python" ]; then
+    PYTHON_BIN="/home/ubuntu/venv-ff/bin/python"
 elif [ -x "${HOME}/venv-ff/bin/python" ]; then
     PYTHON_BIN="${HOME}/venv-ff/bin/python"
-elif [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
-    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+elif [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python" ]; then
+    PYTHON_BIN="${VIRTUAL_ENV}/bin/python"
 elif command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="$(command -v python3)"
 else
@@ -67,10 +67,17 @@ echo "iperf3: ${IPERF_PATH} (${IPERF_VER})"
 # 4. Check Linux network namespace capability
 NETNS_CAPABLE="false"
 if [ "$(uname -s)" = "Linux" ]; then
-    if [ "${IP_PATH}" != "missing" ] && [ "$(id -u)" -eq 0 ]; then
-        if ip netns add ff_env_test 2>/dev/null; then
-            ip netns del ff_env_test 2>/dev/null || true
-            NETNS_CAPABLE="true"
+    if [ "${IP_PATH}" != "missing" ]; then
+        if [ "$(id -u)" -eq 0 ]; then
+            if ip netns add ff_env_test 2>/dev/null; then
+                ip netns del ff_env_test 2>/dev/null || true
+                NETNS_CAPABLE="true"
+            fi
+        elif sudo -n true 2>/dev/null; then
+            if sudo ip netns add ff_env_test 2>/dev/null; then
+                sudo ip netns del ff_env_test 2>/dev/null || true
+                NETNS_CAPABLE="true"
+            fi
         fi
     fi
 fi

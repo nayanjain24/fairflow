@@ -42,8 +42,13 @@ run_step() {
     echo "======================================================================"
     echo "STEP: pytest -q (unit tests)"
     echo "======================================================================"
-    PYTEST_OUT="$("${SCRIPT_DIR}/vm.sh" pytest -q)"
+    PYTEST_CODE=0
+    PYTEST_OUT="$("${SCRIPT_DIR}/vm.sh" pytest -q)" || PYTEST_CODE=$?
     echo "${PYTEST_OUT}"
+    if [ "${PYTEST_CODE}" -ne 0 ]; then
+        echo "ERROR: Unit tests failed with exit code ${PYTEST_CODE}!" >&2
+        exit "${PYTEST_CODE}"
+    fi
     if echo "${PYTEST_OUT}" | grep -qi "skipped"; then
         echo "ERROR: Unit tests had skipped tests!" >&2
         exit 1
@@ -54,8 +59,13 @@ run_step() {
     echo "======================================================================"
     echo "STEP: Integration tests with sudo"
     echo "======================================================================"
-    INTEG_OUT="$("${SCRIPT_DIR}/vm.sh" sudo ~/venv-ff/bin/python -m pytest -m integration -v)"
+    INTEG_CODE=0
+    INTEG_OUT="$("${SCRIPT_DIR}/vm.sh" sudo ~/venv-ff/bin/python -m pytest -m integration -v)" || INTEG_CODE=$?
     echo "${INTEG_OUT}"
+    if [ "${INTEG_CODE}" -ne 0 ]; then
+        echo "ERROR: Integration tests failed with exit code ${INTEG_CODE}!" >&2
+        exit "${INTEG_CODE}"
+    fi
     if echo "${INTEG_OUT}" | grep -qi "SKIPPED"; then
         echo "ERROR: Integration tests were skipped! All integration tests must execute and pass in the VM." >&2
         exit 1

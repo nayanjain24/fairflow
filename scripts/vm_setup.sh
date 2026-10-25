@@ -59,8 +59,9 @@ fi
 echo "Provisioning packages inside VM..."
 multipass exec "${VM_NAME}" -- bash -lc '
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -y
-sudo apt-get install -y python3-venv python3-pip iproute2 iperf3
+sudo -E apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" python3-venv python3-pip iproute2 iperf3
 
 if [ ! -d ~/venv-ff ]; then
     echo "Creating virtual environment at ~/venv-ff..."

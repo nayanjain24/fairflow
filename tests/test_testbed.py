@@ -111,11 +111,11 @@ def test_integration_testbed_up_then_down_is_clean() -> None:
     Fails loudly if not run as root on Linux with iproute2.
     """
     if sys.platform != "linux":
-        pytest.fail("Integration test requires Linux kernel (network namespaces and iproute2)")
+        pytest.fail("Integration test requires Linux kernel; run inside the VM via scripts/vm.sh")
     if os.geteuid() != 0:
-        pytest.fail("Integration test requires root privileges for network namespace operations; run with sudo")
+        pytest.fail("Integration test requires root privileges; run inside the VM via scripts/vm.sh")
     if not shutil.which("ip"):
-        pytest.fail("iproute2 'ip' command not found on PATH")
+        pytest.fail("iproute2 'ip' command not found; run inside the VM via scripts/vm.sh")
 
     scenario_file = "experiments/idle_noise_floor.yaml"
     config = ScenarioConfig.from_yaml(scenario_file)

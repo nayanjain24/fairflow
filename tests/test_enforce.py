@@ -173,11 +173,11 @@ def test_real_integration_rollback_restores_identical_tc_json() -> None:
     Fails loudly if not run as root on Linux with iproute2.
     """
     if sys.platform != "linux":
-        pytest.fail("Integration test requires Linux kernel (network namespaces and iproute2)")
+        pytest.fail("Integration test requires Linux kernel; run inside the VM via scripts/vm.sh")
     if os.geteuid() != 0:
-        pytest.fail("Integration test requires root privileges for network namespace operations; run with sudo")
+        pytest.fail("Integration test requires root privileges; run inside the VM via scripts/vm.sh")
     if not shutil.which("ip") or not shutil.which("tc"):
-        pytest.fail("iproute2 tools (ip, tc) not found on PATH")
+        pytest.fail("iproute2 tools (ip, tc) not found; run inside the VM via scripts/vm.sh")
 
     ns = "ff_integ_ns"
     veth_a = "ff_int_a"

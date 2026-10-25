@@ -5,11 +5,29 @@
 
 set -euo pipefail
 
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "ERROR: run via scripts/vm.sh inside the Ubuntu VM" >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RESULTS_DIR="${REPO_ROOT}/results"
 SCENARIO_YAML="${REPO_ROOT}/experiments/idle_noise_floor.yaml"
-PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+
+# Detect Python (prefer VM external venv ~/venv-ff, active VIRTUAL_ENV, or system)
+if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python" ]; then
+    PYTHON_BIN="${VIRTUAL_ENV}/bin/python"
+elif [ -x "${HOME}/venv-ff/bin/python" ]; then
+    PYTHON_BIN="${HOME}/venv-ff/bin/python"
+elif [ -x "${REPO_ROOT}/.venv/bin/python" ]; then
+    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+else
+    echo "ERROR: python3 not found!" >&2
+    exit 1
+fi
 
 DURATION="${1:-60}"
 RAW_CSV="${RESULTS_DIR}/idle_noise_floor_packets.csv"
@@ -17,17 +35,6 @@ COUNT_FILE="${RESULTS_DIR}/idle_noise_floor_sent.txt"
 SUMMARY_JSON="${RESULTS_DIR}/noise_floor_summary.json"
 
 mkdir -p "${RESULTS_DIR}"
-
-if [ ! -x "${PYTHON_BIN}" ]; then
-    echo "ERROR: Virtual environment Python (${PYTHON_BIN}) not found!" >&2
-    exit 1
-fi
-
-if [ "$(uname -s)" != "Linux" ]; then
-    echo "ERROR: Network namespaces and veth emulation require a Linux environment." >&2
-    echo "Current platform is $(uname -s). Please run on Ubuntu VM." >&2
-    exit 1
-fi
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: Network namespace provisioning requires root privileges. Please re-run with sudo." >&2

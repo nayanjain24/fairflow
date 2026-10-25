@@ -60,11 +60,52 @@ if [ "${IPERF_PATH}" != "missing" ]; then
     IPERF_VER="$(iperf3 -v 2>&1 | head -n 1 || echo "present")"
 fi
 
-echo "tc:     ${TC_PATH} (${TC_VER})"
-echo "ip:     ${IP_PATH} (${IP_VER})"
-echo "iperf3: ${IPERF_PATH} (${IPERF_VER})"
+ETHTOOL_PATH="$(command -v ethtool 2>/dev/null || echo "missing")"
+ETHTOOL_VER="missing"
+if [ "${ETHTOOL_PATH}" != "missing" ]; then
+    ETHTOOL_VER="$(ethtool --version 2>&1 | head -n 1 || echo "present")"
+fi
 
-# 4. Check Linux network namespace capability
+echo "tc:      ${TC_PATH} (${TC_VER})"
+echo "ip:      ${IP_PATH} (${IP_VER})"
+echo "iperf3:  ${IPERF_PATH} (${IPERF_VER})"
+echo "ethtool: ${ETHTOOL_PATH} (${ETHTOOL_VER})"
+
+# 4. Check Kernel modules (qdiscs & impairments)
+check_module() {
+    local mod="$1"
+    if modinfo "${mod}" >/dev/null 2>&1; then
+        echo "true"
+    elif [ "$(id -u)" -eq 0 ] && modprobe -n "${mod}" >/dev/null 2>&1; then
+        echo "true"
+    elif sudo -n modprobe -n "${mod}" >/dev/null 2>&1; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+echo "=== Checking Kernel Modules ==="
+MOD_HTB="$(check_module sch_htb)"
+MOD_FQ_CODEL="$(check_module sch_fq_codel)"
+MOD_CAKE="$(check_module sch_cake)"
+MOD_NETEM="$(check_module sch_netem)"
+MOD_TBF="$(check_module sch_tbf)"
+
+echo "sch_htb:      ${MOD_HTB}"
+echo "sch_fq_codel: ${MOD_FQ_CODEL}"
+echo "sch_cake:     ${MOD_CAKE}"
+echo "sch_netem:    ${MOD_NETEM}"
+echo "sch_tbf:      ${MOD_TBF}"
+
+# 5. Compute SHA-256 of contract.yaml so env.json records which contract was active.
+CONTRACT_SHA256="none"
+if [ -f "${REPO_ROOT}/contract.yaml" ]; then
+    CONTRACT_SHA256="$(sha256sum "${REPO_ROOT}/contract.yaml" | awk '{print $1}')"
+fi
+echo "contract_sha256: ${CONTRACT_SHA256}"
+
+# 6. Check Linux network namespace capability
 NETNS_CAPABLE="false"
 if [ "$(uname -s)" = "Linux" ]; then
     if [ "${IP_PATH}" != "missing" ]; then
@@ -83,7 +124,23 @@ if [ "$(uname -s)" = "Linux" ]; then
 fi
 echo "netns_capable: ${NETNS_CAPABLE}"
 
-# 5. Write results/env.json
+# Report missing dependencies loudly
+MISSING=()
+if [ "${TC_PATH}" = "missing" ]; then MISSING+=("tc"); fi
+if [ "${IP_PATH}" = "missing" ]; then MISSING+=("ip"); fi
+if [ "${IPERF_PATH}" = "missing" ]; then MISSING+=("iperf3"); fi
+if [ "${ETHTOOL_PATH}" = "missing" ]; then MISSING+=("ethtool"); fi
+if [ "${MOD_HTB}" != "true" ]; then MISSING+=("sch_htb"); fi
+if [ "${MOD_FQ_CODEL}" != "true" ]; then MISSING+=("sch_fq_codel"); fi
+if [ "${MOD_CAKE}" != "true" ]; then MISSING+=("sch_cake"); fi
+if [ "${MOD_NETEM}" != "true" ]; then MISSING+=("sch_netem"); fi
+if [ "${MOD_TBF}" != "true" ]; then MISSING+=("sch_tbf"); fi
+
+if [ ${#MISSING[@]} -gt 0 ]; then
+    echo "ERROR: Missing required system dependencies/modules: ${MISSING[*]}" >&2
+fi
+
+# 7. Write results/env.json
 "${PYTHON_BIN}" - <<EOF
 import json
 import platform
@@ -109,8 +166,17 @@ data = {
         "tc": {"path": "${TC_PATH}", "version": "${TC_VER}"},
         "ip": {"path": "${IP_PATH}", "version": "${IP_VER}"},
         "iperf3": {"path": "${IPERF_PATH}", "version": "${IPERF_VER}"},
+        "ethtool": {"path": "${ETHTOOL_PATH}", "version": "${ETHTOOL_VER}"},
     },
-    "netns_capable": "${NETNS_CAPABLE}".lower() == "true"
+    "kernel_modules": {
+        "sch_htb": "${MOD_HTB}".lower() == "true",
+        "sch_fq_codel": "${MOD_FQ_CODEL}".lower() == "true",
+        "sch_cake": "${MOD_CAKE}".lower() == "true",
+        "sch_netem": "${MOD_NETEM}".lower() == "true",
+        "sch_tbf": "${MOD_TBF}".lower() == "true",
+    },
+    "netns_capable": "${NETNS_CAPABLE}".lower() == "true",
+    "contract_sha256": "${CONTRACT_SHA256}",
 }
 
 with open("${ENV_JSON}", "w", encoding="utf-8") as f:
@@ -118,5 +184,9 @@ with open("${ENV_JSON}", "w", encoding="utf-8") as f:
 
 print(f"Recorded environment snapshot to ${ENV_JSON}")
 EOF
+
+if [ ${#MISSING[@]} -gt 0 ]; then
+    exit 1
+fi
 
 echo "=== Environment Check Finished ==="

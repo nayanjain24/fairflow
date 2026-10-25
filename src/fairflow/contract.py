@@ -1,6 +1,6 @@
 """contract.py — FairFlow contract loader and validator.
 
-Loads contract.yaml and enforces four structural invariants before any
+Loads contract.yaml and enforces seven structural invariants before any
 other module reads the values.  The coding agent must never edit contract.yaml;
 only this loader validates it.
 
@@ -10,6 +10,12 @@ Validations (all checked on every load):
   V3  canary.breach_windows * measurement.window_s < canary.duration_s
        (at least one non-breaching window must be possible inside the canary).
   V4  every required value is present and strictly positive (> 0).
+  V5  policy.min_interval_s >= canary.duration_s
+       (the adaptation cooldown must cover at least one full canary trial).
+  V6  sum of floor_mbps <= SCENARIO_B_CAPACITY_MBPS (20 Mbps)
+       (floors must be feasible even on the constrained 20 Mbps test link).
+  V7  canary.breach_windows and recovery.good_windows are positive integers
+       (fractional window counts are meaningless).
 
 Usage:
     from fairflow.contract import load_contract, Contract
@@ -23,6 +29,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+# Minimum link capacity used in Scenario B.  Floors must be feasible here too.
+_SCENARIO_B_CAPACITY_MBPS: float = 20.0
 
 
 class ContractError(Exception):
@@ -54,6 +63,24 @@ def _positive(value: Any, key: str) -> float:
     if f <= 0:
         raise ContractError(f"contract.yaml key '{key}' must be > 0, got {f}")
     return f
+
+
+def _positive_int(value: Any, key: str) -> int:
+    """Return int(value) or raise ContractError if not a positive integer.
+
+    Fractional values (e.g. 2.5) are rejected because window counts must be whole
+    numbers; yaml.safe_load produces int for unquoted integers like '2', so a
+    non-int type here means the author wrote something like '2.0' or a string.
+    """
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ContractError(
+            f"contract.yaml key '{key}' must be a positive integer, got {value!r}"
+        )
+    if value <= 0:
+        raise ContractError(
+            f"contract.yaml key '{key}' must be > 0, got {value}"
+        )
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -89,10 +116,10 @@ class Contract:
 
     # canary
     canary_duration_s: float
-    canary_breach_windows: float
+    canary_breach_windows: int   # must be a positive integer (V7)
 
     # recovery
-    recovery_good_windows: float
+    recovery_good_windows: int   # must be a positive integer (V7)
 
     # policy
     policy_max_step_pct: float
@@ -113,7 +140,7 @@ def load_contract(path: str | Path) -> Contract:
     Raises:
         FileNotFoundError: if the file does not exist.
         ContractError: if any required key is missing, non-positive, or if
-            a structural invariant (V1–V3) is violated.
+            a structural invariant (V1–V7) is violated.
     """
     try:
         import yaml  # type: ignore
@@ -153,9 +180,14 @@ def load_contract(path: str | Path) -> Contract:
     bulk_floor_mbps                        = get("bulk", "floor_mbps")
 
     canary_duration_s                      = get("canary", "duration_s")
-    canary_breach_windows                  = get("canary", "breach_windows")
+    # V7: window counts are loaded via _positive_int (reads the raw yaml value)
+    canary_breach_windows                  = _positive_int(
+        _require(raw, "canary", "breach_windows"), "canary.breach_windows"
+    )
 
-    recovery_good_windows                  = get("recovery", "good_windows")
+    recovery_good_windows                  = _positive_int(
+        _require(raw, "recovery", "good_windows"), "recovery.good_windows"
+    )
 
     policy_max_step_pct                    = get("policy", "max_step_pct")
     policy_min_interval_s                  = get("policy", "min_interval_s")
@@ -201,6 +233,29 @@ def load_contract(path: str | Path) -> Contract:
             f"measurement.window_s ({measurement_window_s}) = {breach_time} "
             f">= canary.duration_s ({canary_duration_s}); "
             "at least one non-breaching window must fit inside the canary"
+        )
+
+    # -----------------------------------------------------------------------
+    # V5: policy.min_interval_s >= canary.duration_s
+    # The adaptation cooldown must span at least one complete canary trial so
+    # consecutive policy changes never overlap with an in-progress canary.
+    # -----------------------------------------------------------------------
+    if policy_min_interval_s < canary_duration_s:
+        raise ContractError(
+            f"V5 violated: policy.min_interval_s ({policy_min_interval_s}) must be "
+            f">= canary.duration_s ({canary_duration_s})"
+        )
+
+    # -----------------------------------------------------------------------
+    # V6: sum of service floors <= Scenario B minimum link capacity (20 Mbps)
+    # Ensures the floor allocation is feasible on the constrained test link.
+    # -----------------------------------------------------------------------
+    if total_floors > _SCENARIO_B_CAPACITY_MBPS:
+        raise ContractError(
+            f"V6 violated: sum of floor_mbps "
+            f"({interactive_floor_mbps} + {streaming_floor_mbps} + {bulk_floor_mbps} "
+            f"= {total_floors}) exceeds the Scenario B capacity "
+            f"({_SCENARIO_B_CAPACITY_MBPS} Mbps)"
         )
 
     return Contract(

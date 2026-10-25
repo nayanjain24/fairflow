@@ -84,6 +84,12 @@ wait ${RECV_PID}
 
 TOTAL_SENT="$(cat "${COUNT_FILE}")"
 
+# Compute SHA-256 of contract.yaml so every run's metadata is tied to the exact contract.
+CONTRACT_HASH="none"
+if [ -f "${REPO_ROOT}/contract.yaml" ]; then
+    CONTRACT_HASH="$(sha256sum "${REPO_ROOT}/contract.yaml" | awk '{print $1}')"
+fi
+
 TIMESTAMP="$(date -u +"%Y%m%d_%H%M%S")"
 TIMESTAMPED_JSON="${RESULTS_DIR}/noise_floor_${TIMESTAMP}.json"
 
@@ -92,6 +98,17 @@ PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m src.fairflow.traffic summary \
     --csv "${RAW_CSV}" \
     --total-sent "${TOTAL_SENT}" \
     --out "${SUMMARY_JSON}"
+
+# Inject contract_sha256 into the summary JSON using Python so we don't need jq.
+PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" - << EOF
+import json
+from pathlib import Path
+
+path = Path("${SUMMARY_JSON}")
+data = json.loads(path.read_text(encoding="utf-8"))
+data["contract_sha256"] = "${CONTRACT_HASH}"
+path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+EOF
 
 cp "${SUMMARY_JSON}" "${TIMESTAMPED_JSON}"
 echo "Saved timestamped run summary to ${TIMESTAMPED_JSON}"

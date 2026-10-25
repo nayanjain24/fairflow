@@ -4,11 +4,15 @@ Tests are self-contained: they build in-memory YAML strings rather than
 touching contract.yaml, so they run as a normal user with no side-effects.
 
 Covers:
-  - Happy path: the real contract.yaml values pass all four validations.
+  - SHA256 integrity check: contract.sha256 must match the committed contract.yaml.
+  - Happy path: the real contract.yaml values pass all seven validations.
   - V1: guardrail must be > target for each paired metric.
   - V2: sum of floor_mbps must not exceed link.default_capacity_mbps.
   - V3: breach_windows * window_s must be < canary.duration_s.
   - V4: missing keys and non-positive values each raise ContractError.
+  - V5: policy.min_interval_s >= canary.duration_s.
+  - V6: sum of floor_mbps <= 20 Mbps (Scenario B capacity).
+  - V7: breach_windows and good_windows must be positive integers.
   - Immutability: the returned Contract object cannot be mutated.
   - FileNotFoundError for a non-existent path.
 """
@@ -124,13 +128,6 @@ def test_v1_guardrail_must_exceed_target(
     tmp_path: Path, broken_key: str, broken_value: float, desc: str
 ) -> None:
     """V1: any guardrail <= its paired target must be rejected with ContractError."""
-    yaml_text = VALID_YAML.replace(
-        # replace the first occurrence of the key under [interactive]
-        f"      {broken_key}:",
-        f"      {broken_key}: {broken_value}\n      _orig_{broken_key}:",
-        1,
-    )
-    # Build YAML differently — inject the bad value directly
     import yaml
     raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
     raw["interactive"][broken_key] = broken_value
@@ -160,16 +157,21 @@ def test_v2_floors_exceed_capacity_raises(tmp_path: Path) -> None:
 
 
 def test_v2_floors_exactly_at_capacity_pass(tmp_path: Path) -> None:
-    """V2: floors summing to exactly the link capacity are allowed (<=, not <)."""
+    """V2: floors summing to exactly the link capacity are allowed (<=, not <).
+
+    Uses link.default_capacity_mbps = 12 with floors = 2+8+2 = 12 to stay
+    within V6's 20 Mbps Scenario B cap as well.
+    """
     import yaml
     raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
-    # 90 + 8 + 2 = 100 == 100 → should pass
-    raw["interactive"]["floor_mbps"] = 90.0
+    # Set link capacity to 12 and interactive floor to 2 so 2+8+2=12 == capacity.
+    raw["link"]["default_capacity_mbps"] = 12.0
+    raw["interactive"]["floor_mbps"] = 2.0
     p = tmp_path / "contract.yaml"
     p.write_text(yaml.dump(raw), encoding="utf-8")
 
     c = load_contract(p)
-    assert c.interactive_floor_mbps == 90.0
+    assert c.link_default_capacity_mbps == 12.0
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +214,8 @@ def test_v3_valid_breach_windows_pass(tmp_path: Path) -> None:
     p.write_text(yaml.dump(raw), encoding="utf-8")
 
     c = load_contract(p)
-    assert c.canary_breach_windows == 4.0
+    assert c.canary_breach_windows == 4
+    assert isinstance(c.canary_breach_windows, int)
 
 
 # ---------------------------------------------------------------------------
@@ -292,3 +295,146 @@ def test_contract_is_immutable(tmp_path: Path) -> None:
     c = load_contract(p)
     with pytest.raises(Exception):  # dataclasses.FrozenInstanceError
         c.measurement_window_s = 999.0  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# contract.sha256 integrity
+# ---------------------------------------------------------------------------
+
+def test_contract_sha256_matches_committed_file() -> None:
+    """contract.sha256 must contain the SHA-256 hex digest of contract.yaml.
+
+    If they disagree the human must rerun:
+        sha256sum contract.yaml | awk '{print $1}' > contract.sha256
+    The coding agent must never auto-update either file.
+    """
+    import hashlib
+    repo_root = Path(__file__).resolve().parent.parent
+    sha_file = repo_root / "contract.sha256"
+    contract_file = repo_root / "contract.yaml"
+    if not sha_file.exists() or not contract_file.exists():
+        pytest.skip("contract.sha256 or contract.yaml not present in repo root")
+    expected = sha_file.read_text(encoding="utf-8").strip()
+    actual = hashlib.sha256(contract_file.read_bytes()).hexdigest()
+    assert actual == expected, (
+        f"contract.sha256 is stale.\n"
+        f"  stored : {expected}\n"
+        f"  actual : {actual}\n"
+        "Run: sha256sum contract.yaml | awk '{print $1}' > contract.sha256"
+    )
+
+
+# ---------------------------------------------------------------------------
+# V5: policy.min_interval_s >= canary.duration_s
+# ---------------------------------------------------------------------------
+
+def test_v5_min_interval_less_than_canary_duration_raises(tmp_path: Path) -> None:
+    """V5: policy.min_interval_s < canary.duration_s must raise ContractError."""
+    import yaml
+    raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
+    # canary.duration_s = 10; set min_interval to 9 → 9 < 10 → should fail
+    raw["policy"]["min_interval_s"] = 9
+    p = tmp_path / "contract.yaml"
+    p.write_text(yaml.dump(raw), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="V5 violated"):
+        load_contract(p)
+
+
+def test_v5_min_interval_equal_to_canary_duration_passes(tmp_path: Path) -> None:
+    """V5: policy.min_interval_s == canary.duration_s is the minimum allowed value."""
+    import yaml
+    raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
+    raw["policy"]["min_interval_s"] = 10   # exactly equal to canary.duration_s
+    p = tmp_path / "contract.yaml"
+    p.write_text(yaml.dump(raw), encoding="utf-8")
+
+    c = load_contract(p)
+    assert c.policy_min_interval_s == 10.0
+
+
+# ---------------------------------------------------------------------------
+# V6: sum of floors <= Scenario B capacity (20 Mbps)
+# ---------------------------------------------------------------------------
+
+def test_v6_floors_exceed_scenario_b_raises(tmp_path: Path) -> None:
+    """V6: floors summing beyond 20 Mbps must raise ContractError."""
+    import yaml
+    raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
+    # 15 + 8 + 2 = 25 > 20 → should fail
+    raw["interactive"]["floor_mbps"] = 15.0
+    # also raise link capacity so V2 doesn't trigger first
+    raw["link"]["default_capacity_mbps"] = 200.0
+    p = tmp_path / "contract.yaml"
+    p.write_text(yaml.dump(raw), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="V6 violated"):
+        load_contract(p)
+
+
+def test_v6_floors_exactly_at_scenario_b_capacity_pass(tmp_path: Path) -> None:
+    """V6: floors summing to exactly 20 Mbps are allowed (<= not <)."""
+    import yaml
+    raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
+    # 10 + 8 + 2 = 20 == 20 → allowed
+    raw["interactive"]["floor_mbps"] = 10.0
+    p = tmp_path / "contract.yaml"
+    p.write_text(yaml.dump(raw), encoding="utf-8")
+
+    c = load_contract(p)
+    assert c.interactive_floor_mbps == 10.0
+
+
+# ---------------------------------------------------------------------------
+# V7: breach_windows and good_windows must be positive integers
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("section,key,bad_value,desc", [
+    ("canary",    "breach_windows", 2.0,   "float instead of int"),
+    ("canary",    "breach_windows", 2.5,   "fractional float"),
+    ("canary",    "breach_windows", "2",   "string"),
+    ("recovery",  "good_windows",   3.0,   "float instead of int"),
+    ("recovery",  "good_windows",   True,  "boolean (True) must be rejected"),
+])
+def test_v7_non_integer_window_count_raises(
+    tmp_path: Path, section: str, key: str, bad_value: object, desc: str
+) -> None:
+    """V7: breach_windows and good_windows must be positive integers, not floats/strings."""
+    import yaml
+    raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
+    raw[section][key] = bad_value
+    p = tmp_path / "contract.yaml"
+    p.write_text(yaml.dump(raw), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="must be a positive integer"):
+        load_contract(p)
+
+
+@pytest.mark.parametrize("section,key,bad_value", [
+    ("canary",   "breach_windows", 0),
+    ("canary",   "breach_windows", -1),
+    ("recovery", "good_windows",   0),
+    ("recovery", "good_windows",  -3),
+])
+def test_v7_non_positive_integer_raises(
+    tmp_path: Path, section: str, key: str, bad_value: int
+) -> None:
+    """V7: breach_windows and good_windows that are zero or negative must be rejected."""
+    import yaml
+    raw = yaml.safe_load(textwrap.dedent(VALID_YAML))
+    raw[section][key] = bad_value
+    p = tmp_path / "contract.yaml"
+    p.write_text(yaml.dump(raw), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="must be > 0"):
+        load_contract(p)
+
+
+def test_v7_valid_integer_window_counts_pass(tmp_path: Path) -> None:
+    """V7: canary_breach_windows and recovery_good_windows are stored as int."""
+    p = _write_yaml(tmp_path, VALID_YAML)
+    c = load_contract(p)
+    assert isinstance(c.canary_breach_windows, int)
+    assert isinstance(c.recovery_good_windows, int)
+    assert c.canary_breach_windows == 2
+    assert c.recovery_good_windows == 3

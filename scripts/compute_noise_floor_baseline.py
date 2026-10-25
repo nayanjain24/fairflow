@@ -29,13 +29,14 @@ OUTPUT_FILE = RESULTS_DIR / "noise_floor_baseline.json"
 
 def load_runs(results_dir: Path, min_packets: int) -> list:
     """Load all timestamped noise-floor JSON files from results_dir."""
-    files = sorted(results_dir.glob("noise_floor_*.json"))
+    # Only match timestamped run files: noise_floor_YYYYMMDD_HHMMSS.json
+    # This deliberately excludes noise_floor_summary.json and noise_floor_baseline.json.
+    import re as _re
+    _TS_RE = _re.compile(r"^noise_floor_\d{8}_\d{6}\.json$")
+    files = sorted(f for f in results_dir.glob("noise_floor_*.json") if _TS_RE.match(f.name))
     runs = []
     skipped = []
     for f in files:
-        # Skip the rolling summary; it is not a per-run file
-        if f.name == "noise_floor_summary.json":
-            continue
         try:
             with f.open(encoding="utf-8") as fh:
                 data = json.load(fh)

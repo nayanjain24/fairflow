@@ -1,5 +1,5 @@
 {
-  "computed_at_utc": "2026-10-25T18:07:41Z",
+  "computed_at_utc": "2026-10-25T18:15:46Z",
   "run_count": 5,
   "source_files": [
     "noise_floor_20261025_174942.json",
@@ -36,6 +36,17 @@
     }
   },
   "contract_margins": {
-    "note": "contract.yaml not yet committed; rerun after it is added"
+    "interactive.added_delay_guardrail_ms": {
+      "contract_value_ms": 80.0,
+      "worst_noise_floor_p99_ms": 0.821,
+      "ratio": 97.44,
+      "note": "contract guardrail / worst observed p99; ratio > 1 means noise floor is safely below guardrail"
+    },
+    "interactive.jitter_guardrail_ms": {
+      "contract_value_ms": 30.0,
+      "worst_noise_floor_jitter_ms": 0.157,
+      "ratio": 191.08,
+      "note": "contract guardrail / worst observed jitter; ratio > 1 means noise floor is safely below guardrail"
+    }
   }
 }

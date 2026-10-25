@@ -1,0 +1,39 @@
+# contract.yaml - FairFlow safety contract.
+# Owned by humans; the coding agent must NOT edit this file.
+# All delays are ADDED one-way delay over the idle baseline (congested minus idle),
+# so the contract does not depend on the emulated base delay.
+version: 1
+
+measurement:
+  window_s: 2                      # 2 s at 50 packets/s = about 100 call packets per window
+
+interactive:                       # calls and gaming
+  added_delay_target_ms: 30        # target for added one-way delay
+  added_delay_guardrail_ms: 80     # looser than target; breach triggers rollback
+  jitter_target_ms: 10             # RFC 3550 interarrival jitter
+  jitter_guardrail_ms: 30
+  loss_target_pct: 0.5
+  loss_guardrail_pct: 2.0
+  floor_mbps: 2.0                  # absolute minimum service floor
+
+streaming:
+  floor_mbps: 8.0                  # aggregate floor for streams in Scenario C
+  added_delay_guardrail_ms: 200    # streams buffer, so they tolerate more delay
+
+bulk:
+  floor_mbps: 2.0                  # background download must keep making progress
+
+canary:
+  duration_s: 10                   # 5 measurement windows
+  breach_windows: 2                # consecutive bad windows to declare a breach
+
+recovery:
+  good_windows: 3                  # consecutive good windows to count as recovered
+
+policy:
+  max_step_pct: 25                 # largest change to any rate per adaptation
+  min_interval_s: 15               # minimum time between policy changes
+  deadband_pct: 10                 # hysteresis: ignore changes smaller than this
+
+link:
+  default_capacity_mbps: 100       # Scenario A; Scenario B drops to 20

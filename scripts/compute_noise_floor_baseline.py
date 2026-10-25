@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """compute_noise_floor_baseline.py
 
-Reads all results/noise_floor_<timestamp>.json files, computes min/median/max
-aggregates, and optionally reads contract.yaml to compute headroom margins.
+Reads all results/noise_floor_<timestamp>.json files (excluding noise_floor_summary.json),
+computes min/median/max aggregates across the full runs, and optionally reads contract.yaml
+to compute headroom margins (contract guardrail / worst observed noise-floor value).
+
+Margins are printed with their exact contract.yaml key names so they are auditable.
 
 Writes results/noise_floor_baseline.json.
 
@@ -30,6 +33,7 @@ def load_runs(results_dir: Path, min_packets: int) -> list:
     runs = []
     skipped = []
     for f in files:
+        # Skip the rolling summary; it is not a per-run file
         if f.name == "noise_floor_summary.json":
             continue
         try:
@@ -46,11 +50,9 @@ def load_runs(results_dir: Path, min_packets: int) -> list:
         runs.append(data)
 
     if skipped:
-        print(
-            f"INFO: Skipped {len(skipped)} run(s) with < {min_packets} packets: "
-            + ", ".join(f"{name} ({n})" for name, n in skipped),
-            file=sys.stderr,
-        )
+        names = ", ".join(f"{name} ({n} pkts)" for name, n in skipped)
+        print(f"INFO: Skipped {len(skipped)} run(s) with < {min_packets} packets: {names}",
+              file=sys.stderr)
     return runs
 
 
@@ -75,7 +77,7 @@ def aggregate_field(runs: list, field: str) -> dict:
 
 
 def load_contract(repo_root: Path):
-    """Try to read contract.yaml; return None if not present."""
+    """Try to read contract.yaml; return None if not present or pyyaml missing."""
     contract_path = repo_root / "contract.yaml"
     if not contract_path.exists():
         return None
@@ -88,40 +90,48 @@ def load_contract(repo_root: Path):
         return yaml.safe_load(fh)
 
 
-def compute_margins(contract: dict, worst_p99: float, worst_jitter: float) -> dict:
-    """
-    Compute headroom ratios: contract_limit / observed_value.
-    Ratio > 1 means observed is safely within the contract limit.
-    Reads: constraints.voice.max_delay_ms and constraints.voice.max_jitter_ms.
+def compute_margins(contract: dict, worst_p99_ms: float, worst_jitter_ms: float) -> dict:
+    """Compute headroom ratios for the two delay metrics.
+
+    Formula: contract_guardrail / worst_observed_noise_floor.
+    A ratio > 1 means the noise floor is comfortably below the guardrail.
+    Keys are printed verbatim from contract.yaml so the computation is auditable.
     """
     margins = {}
-    try:
-        voice = contract["constraints"]["voice"]
-        max_delay = float(voice["max_delay_ms"])
-        margins["p99_delay_headroom"] = {
-            "contract_limit_ms": max_delay,
-            "observed_worst_p99_ms": worst_p99,
-            "ratio": round(max_delay / worst_p99, 2) if worst_p99 > 0 else None,
-            "note": "ratio > 1 means observed is within contract",
-        }
-    except (KeyError, TypeError):
-        margins["p99_delay_headroom"] = {
-            "note": "key constraints.voice.max_delay_ms not found in contract.yaml"
-        }
 
+    # --- added-delay headroom ---
+    key_delay = "interactive.added_delay_guardrail_ms"
     try:
-        voice = contract["constraints"]["voice"]
-        max_jitter = float(voice["max_jitter_ms"])
-        margins["jitter_headroom"] = {
-            "contract_limit_ms": max_jitter,
-            "observed_worst_jitter_ms": worst_jitter,
-            "ratio": round(max_jitter / worst_jitter, 2) if worst_jitter > 0 else None,
-            "note": "ratio > 1 means observed is within contract",
+        guardrail_delay = float(contract["interactive"]["added_delay_guardrail_ms"])
+        ratio_delay = round(guardrail_delay / worst_p99_ms, 2) if worst_p99_ms > 0 else None
+        margins[key_delay] = {
+            "contract_value_ms": guardrail_delay,
+            "worst_noise_floor_p99_ms": worst_p99_ms,
+            "ratio": ratio_delay,
+            "note": "contract guardrail / worst observed p99; ratio > 1 means noise floor is safely below guardrail",
         }
-    except (KeyError, TypeError):
-        margins["jitter_headroom"] = {
-            "note": "key constraints.voice.max_jitter_ms not found in contract.yaml"
+        print(f"  {key_delay} = {guardrail_delay} ms  |  "
+              f"worst p99 = {worst_p99_ms} ms  |  ratio = {ratio_delay}")
+    except (KeyError, TypeError) as exc:
+        margins[key_delay] = {"error": str(exc)}
+        print(f"  WARNING: could not read {key_delay}: {exc}", file=sys.stderr)
+
+    # --- jitter headroom ---
+    key_jitter = "interactive.jitter_guardrail_ms"
+    try:
+        guardrail_jitter = float(contract["interactive"]["jitter_guardrail_ms"])
+        ratio_jitter = round(guardrail_jitter / worst_jitter_ms, 2) if worst_jitter_ms > 0 else None
+        margins[key_jitter] = {
+            "contract_value_ms": guardrail_jitter,
+            "worst_noise_floor_jitter_ms": worst_jitter_ms,
+            "ratio": ratio_jitter,
+            "note": "contract guardrail / worst observed jitter; ratio > 1 means noise floor is safely below guardrail",
         }
+        print(f"  {key_jitter} = {guardrail_jitter} ms  |  "
+              f"worst jitter = {worst_jitter_ms} ms  |  ratio = {ratio_jitter}")
+    except (KeyError, TypeError) as exc:
+        margins[key_jitter] = {"error": str(exc)}
+        print(f"  WARNING: could not read {key_jitter}: {exc}", file=sys.stderr)
 
     return margins
 
@@ -139,43 +149,51 @@ def main() -> None:
     runs = load_runs(RESULTS_DIR, args.min_packets)
     if len(runs) < 2:
         print(
-            f"ERROR: Need at least 2 valid runs; found {len(runs)}.",
+            f"ERROR: Need at least 2 valid runs for a meaningful baseline; found {len(runs)}.",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    print(f"Aggregating {len(runs)} run(s):", [r["_source_file"] for r in runs])
+    print(f"Aggregating {len(runs)} run(s):")
+    for r in runs:
+        print(f"  {r['_source_file']}")
 
-    baseline = {
+    agg_p50  = aggregate_field(runs, "p50_delay_ms")
+    agg_p99  = aggregate_field(runs, "p99_delay_ms")
+    agg_mean = aggregate_field(runs, "mean_delay_ms")
+    agg_jit  = aggregate_field(runs, "jitter_ms")
+    agg_loss = aggregate_field(runs, "loss_pct")
+
+    worst_p99    = agg_p99["max"]
+    worst_jitter = agg_jit["max"]
+
+    baseline: dict = {
         "computed_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "run_count": len(runs),
         "source_files": [r["_source_file"] for r in runs],
         "aggregate_ms": {
-            "p50_delay": aggregate_field(runs, "p50_delay_ms"),
-            "p99_delay": aggregate_field(runs, "p99_delay_ms"),
-            "mean_delay": aggregate_field(runs, "mean_delay_ms"),
-            "jitter": aggregate_field(runs, "jitter_ms"),
-            "loss_pct": aggregate_field(runs, "loss_pct"),
+            "p50_delay":  agg_p50,
+            "p99_delay":  agg_p99,
+            "mean_delay": agg_mean,
+            "jitter":     agg_jit,
+            "loss_pct":   agg_loss,
         },
     }
-
-    worst_p99 = baseline["aggregate_ms"]["p99_delay"]["max"]
-    worst_jitter = baseline["aggregate_ms"]["jitter"]["max"]
 
     contract = load_contract(REPO_ROOT)
     if contract is None:
         baseline["contract_margins"] = {
-            "note": "contract.yaml not yet committed; rerun after it is added"
+            "note": "contract.yaml not found; rerun after it is committed"
         }
         print("INFO: contract.yaml not found; margins skipped.")
     else:
+        print("\nContract margins (guardrail / worst noise-floor value):")
         baseline["contract_margins"] = compute_margins(contract, worst_p99, worst_jitter)
-        print("INFO: contract.yaml found; margins computed.")
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_FILE.open("w", encoding="utf-8") as fh:
         json.dump(baseline, fh, indent=2)
-    print(f"Written: {OUTPUT_FILE}")
+    print(f"\nWritten: {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

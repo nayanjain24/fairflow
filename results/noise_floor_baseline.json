@@ -1,0 +1,41 @@
+{
+  "computed_at_utc": "2026-10-25T18:07:41Z",
+  "run_count": 5,
+  "source_files": [
+    "noise_floor_20261025_174942.json",
+    "noise_floor_20261025_175045.json",
+    "noise_floor_20261025_175147.json",
+    "noise_floor_20261025_175250.json",
+    "noise_floor_20261025_175353.json"
+  ],
+  "aggregate_ms": {
+    "p50_delay": {
+      "min": 0.167,
+      "median": 0.207,
+      "max": 0.233
+    },
+    "p99_delay": {
+      "min": 0.61,
+      "median": 0.681,
+      "max": 0.821
+    },
+    "mean_delay": {
+      "min": 0.218,
+      "median": 0.245,
+      "max": 0.271
+    },
+    "jitter": {
+      "min": 0.058,
+      "median": 0.107,
+      "max": 0.157
+    },
+    "loss_pct": {
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0
+    }
+  },
+  "contract_margins": {
+    "note": "contract.yaml not yet committed; rerun after it is added"
+  }
+}

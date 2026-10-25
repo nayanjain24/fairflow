@@ -77,10 +77,16 @@ wait ${RECV_PID}
 
 TOTAL_SENT="$(cat "${COUNT_FILE}")"
 
+TIMESTAMP="$(date -u +"%Y%m%d_%H%M%S")"
+TIMESTAMPED_JSON="${RESULTS_DIR}/noise_floor_${TIMESTAMP}.json"
+
 echo "=== Analyzing Raw CSV and Generating Summary ==="
 PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m src.fairflow.traffic summary \
     --csv "${RAW_CSV}" \
     --total-sent "${TOTAL_SENT}" \
     --out "${SUMMARY_JSON}"
+
+cp "${SUMMARY_JSON}" "${TIMESTAMPED_JSON}"
+echo "Saved timestamped run summary to ${TIMESTAMPED_JSON}"
 
 echo "=== Idle Noise Floor Run Complete ==="

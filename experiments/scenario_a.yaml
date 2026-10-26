@@ -1,0 +1,229 @@
+# experiments/scenario_a.yaml - M2 Scenario A: Home-Broadband Download During a Call
+# Pre-registration specification for M2 baseline evaluations.
+# Do not edit after m2-prereg git tag without logging in docs/DEVIATIONS.md.
+
+version: 1
+scenario_name: "scenario_a_baselines"
+
+# ---------------------------------------------------------------------------
+# Testbed Topology (Emulated via Linux network namespaces and veth pairs)
+# ---------------------------------------------------------------------------
+namespaces:
+  client: "ff_client"
+  router: "ff_router"
+  server: "ff_server"
+
+links:
+  lan:
+    endpoint_a:
+      namespace: "ff_client"
+      interface: "ff_c_lan"
+      ip: "10.0.1.2/24"
+    endpoint_b:
+      namespace: "ff_router"
+      interface: "ff_r_lan"
+      ip: "10.0.1.1/24"
+  wan:
+    endpoint_a:
+      namespace: "ff_router"
+      interface: "ff_r_wan"
+      ip: "10.0.2.1/24"
+    endpoint_b:
+      namespace: "ff_server"
+      interface: "ff_s_wan"
+      ip: "10.0.2.2/24"
+
+routes:
+  - namespace: "ff_client"
+    destination: "10.0.2.0/24"
+    gateway: "10.0.1.1"
+  - namespace: "ff_server"
+    destination: "10.0.1.0/24"
+    gateway: "10.0.2.1"
+
+# ---------------------------------------------------------------------------
+# WAN Propagation Delay & ISP Bottleneck Emulation
+# Idle RTT: 30 ms total (15 ms on ff_s_wan downstream + 15 ms on ff_r_wan upstream).
+# Downstream ISP bottleneck (ff_s_wan): netem delay 15ms + child TBF rate limiter
+# with 200 ms drop-tail buffer.
+# Expected standing one-way delay under unmanaged congestion (R0): ~215 ms (15 ms base + 200 ms queue).
+# Measured standing one-way delay in calibration: 214.94 ms (-0.06 ms from theoretical).
+# ---------------------------------------------------------------------------
+wan_delay_upstream:
+  interface: "ff_r_wan"
+  namespace: "ff_router"
+  delay_ms: 15.0
+  netem_limit_pkts: 100000          # High limit to ensure netem never drops packets
+  tc_command: "tc qdisc replace dev ff_r_wan root handle 1: netem delay 15ms limit 100000"
+
+bottleneck:
+  interface: "ff_s_wan"
+  namespace: "ff_server"
+  capacity_mbps: 100.0              # Matches contract.link.default_capacity_mbps
+  base_one_way_delay_ms: 15.0       # 15 ms one-way delay
+  netem_limit_pkts: 100000          # Sized large so root netem never drops packets
+  bottleneck_buffer_ms: 200.0       # 200 ms dumb modem drop-tail buffer
+  burst: "4096b"                    # Selected: smallest burst achieving >= 93.5 Mbps (measured: 95.57 Mbps)
+  limit_bytes: 2500000              # 2.5 MB (= 100 Mbps * 200 ms / 8)
+  tc_commands:
+    - "tc qdisc replace dev ff_s_wan root handle 1: netem delay 15ms limit 100000"
+    - "tc qdisc replace dev ff_s_wan parent 1: handle 2: tbf rate 100mbit burst 4096b limit 2500000"
+
+# ---------------------------------------------------------------------------
+# Home Router QoS (router LAN egress: ff_r_lan in namespace ff_router)
+# Shaped to 95% of bottleneck to pull the queue into the router.
+# ---------------------------------------------------------------------------
+home_qos:
+  interface: "ff_r_lan"
+  namespace: "ff_router"
+  shaping_fraction: 0.95            # 0.95 * 100 Mbps = 95.0 Mbps
+  shaping_rate_mbps: 95.0
+  # Contract floors for B1 static HTB:
+  interactive_floor_mbps: 2.0       # contract.interactive.floor_mbps
+  streaming_floor_mbps: 8.0         # contract.streaming.floor_mbps
+  bulk_floor_mbps: 2.0              # contract.bulk.floor_mbps
+
+# ---------------------------------------------------------------------------
+# Traffic Generation (Direction: server -> client)
+# ---------------------------------------------------------------------------
+traffic:
+  call:
+    sender_namespace: "ff_server"
+    receiver_namespace: "ff_client"
+    receiver_ip: "10.0.1.2"
+    port: 5004                      # Standard RTP UDP destination port
+    interval_ms: 20.0               # 50 packets/s
+    payload_bytes: 160              # G.711 voice payload (total IP packet ~200-218 bytes)
+  download:
+    server_namespace: "ff_server"
+    client_namespace: "ff_client"
+    server_ip: "10.0.2.2"
+    port: 5201                      # Standard iperf3 port
+    parallel_streams: 1
+    interval_s: 1.0
+    reverse_mode: true              # iperf3 -R: data flows downstream (server -> client)
+
+# ---------------------------------------------------------------------------
+# Hardware Offloads (ethtool)
+# Disabled on all ff_ veth interfaces to avoid segmentation distortion.
+# ---------------------------------------------------------------------------
+offloads:
+  disable:
+    - "gso"
+    - "gro"
+    - "tso"
+
+# ---------------------------------------------------------------------------
+# Process Pinning (vCPUs 0-5 in Ubuntu VM)
+# ---------------------------------------------------------------------------
+cpu_pinning:
+  call_sender: 1
+  call_receiver: 2
+  iperf3_server: 3
+  iperf3_client: 4
+
+# ---------------------------------------------------------------------------
+# Execution Phases (seconds)
+# Phase slicing MUST use observed iperf3 start/end timestamps on the monotonic
+# clock, not nominal sleeps.
+# ---------------------------------------------------------------------------
+phases:
+  full:
+    baseline_s: 10.0                # Call only
+    congested_s: 30.0               # Call + download
+    tail_s: 10.0                    # Call only (post-download recovery)
+    ramp_s: 5.0                     # Excluded from congested steady-state
+    n_trials_per_arm: 10
+  smoke:
+    baseline_s: 3.0
+    congested_s: 7.0
+    tail_s: 3.0
+    ramp_s: 2.0
+    n_trials_per_arm: 2
+
+# ---------------------------------------------------------------------------
+# Pre-registered Evaluation & Analysis Rules
+# ---------------------------------------------------------------------------
+evaluation:
+  primary_metric: "congested_added_delay_p99_ms"
+  secondary_metrics:
+    - "congested_added_delay_p95_ms"
+    - "bulk_goodput_fraction"
+    - "call_loss_pct"
+  phase_slicing:
+    method: "observed_monotonic_timestamps"
+    description: "Slicing uses observed iperf3 start and stop timestamps on the host monotonic clock, not nominal sleeps."
+  contract_checks:
+    interactive_target_ms: 30.0     # contract.interactive.added_delay_target_ms
+    bulk_floor_mbps: 2.0            # contract.bulk.floor_mbps
+  report_format:
+    interactive_target_met: "k/N"   # e.g., 10/10 trials met target
+
+# ---------------------------------------------------------------------------
+# Stop Conditions and Invalid-Trial Policy
+# ---------------------------------------------------------------------------
+guardrails:
+  r0_min_added_delay_ms: 50.0       # STOP if R0 added delay < 50 ms (bottleneck model failure)
+  max_sender_lateness_ms: 2.0       # Mark trial INVALID if sender scheduling lateness p99 > 2.0 ms
+  max_invalid_trials_per_arm: 2     # STOP run if any arm produces > 2 invalid trials
+  invalid_trial_policy: "report_all_and_rerun_in_place" # Log invalid trial, rerun in same schedule slot
+
+# ---------------------------------------------------------------------------
+# Arm Specifications & Exact tc Configurations
+# Both fq_codel and CAKE use Linux kernel defaults without ad-hoc tuning.
+# ---------------------------------------------------------------------------
+arms:
+  R0_no_qos:
+    description: "Router ff_r_lan has unmanaged pfifo queue (buffer builds at ISP bottleneck)."
+    tc_commands:
+      - "tc qdisc replace dev ff_r_lan root pfifo limit 1000"
+
+  B1_static_htb:
+    description: "Static HTB at 95 Mbps with fixed contract floor classes. UDP dst port 5004 -> class 1:10 (interactive), default -> class 1:30 (bulk)."
+    tc_commands:
+      - "tc qdisc replace dev ff_r_lan root handle 1: htb default 30 r2q 100"
+      - "tc class replace dev ff_r_lan parent 1: classid 1:1 htb rate 95mbit ceil 95mbit"
+      - "tc class replace dev ff_r_lan parent 1:1 classid 1:10 htb rate 2mbit ceil 95mbit prio 1"
+      - "tc class replace dev ff_r_lan parent 1:1 classid 1:20 htb rate 8mbit ceil 95mbit prio 2"
+      - "tc class replace dev ff_r_lan parent 1:1 classid 1:30 htb rate 2mbit ceil 95mbit prio 3"
+      - "tc qdisc replace dev ff_r_lan parent 1:10 handle 10: pfifo limit 1000"
+      - "tc qdisc replace dev ff_r_lan parent 1:20 handle 20: pfifo limit 1000"
+      - "tc qdisc replace dev ff_r_lan parent 1:30 handle 30: pfifo limit 1000"
+      - "tc filter replace dev ff_r_lan parent 1: protocol ip prio 1 u32 match ip protocol 17 0xff match ip dport 5004 0xffff flowid 1:10"
+
+  B2a_fq_codel:
+    description: "HTB root shaped to 95 Mbps with default fq_codel leaf (standard kernel defaults, no tuning)."
+    tc_commands:
+      - "tc qdisc replace dev ff_r_lan root handle 1: htb default 1 r2q 100"
+      - "tc class replace dev ff_r_lan parent 1: classid 1:1 htb rate 95mbit ceil 95mbit"
+      - "tc qdisc replace dev ff_r_lan parent 1:1 handle 10: fq_codel"
+
+  B2b_cake:
+    description: "CAKE shaped to 95 Mbps with all default options (diffserv3, triple-isolate, unshaped ACK filter off, 100ms RTT, raw overhead 0, no tuning)."
+    tc_command: "tc qdisc replace dev ff_r_lan root cake bandwidth 95mbit diffserv3 triple-isolate nonat nowash no-ack-filter split-gso rtt 100ms raw overhead 0"
+
+# ---------------------------------------------------------------------------
+# Trial Metadata Snapshot Requirements
+# Recorded in each trial's metadata JSON.
+# ---------------------------------------------------------------------------
+metadata_capture:
+  sysctl:
+    - "net.ipv4.tcp_congestion_control"
+    - "net.ipv4.tcp_rmem"
+    - "net.ipv4.tcp_wmem"
+    - "net.core.default_qdisc"
+  system:
+    - "vCPU_count"
+    - "cpu_model"
+    - "contract_sha256"
+  network:
+    - "ethtool_offload_status_all_ff_interfaces"
+    - "tc_qdisc_show_before_trial"
+    - "tc_class_show_before_trial"
+    - "tc_qdisc_show_after_trial"
+    - "tc_class_show_after_trial"
+
+schedule:
+  random_seed: 42
+  cooldown_s: 5.0
+  rebuild_testbed_per_trial: true

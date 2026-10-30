@@ -1,11 +1,27 @@
 # FairFlow
 
+[![Build, Test & Publish FairFlow Docker Image](https://github.com/nayanjain24/fairflow/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/nayanjain24/fairflow/actions/workflows/docker-publish.yml)
+
 Adaptive QoS Engine for Mixed Home Broadband Traffic (TELIPORT Season 4, Case Study 3).
 
 ## Overview
 FairFlow is a constraint-aware QoS controller for a home broadband link, emulated in a Linux lab. It evaluates candidate policies against explicit performance, minimum-service and stability constraints, deploys eligible ones through a short canary, measures the actual outcome, and automatically rolls back to the last-known-good policy if guardrails are breached. If capacity makes the constraints infeasible, it reports the conflict instead of claiming success.
 
 Hardware behaviour is emulated using Linux network namespaces, veth pairs, and tc (HTB/fq_codel).
+
+## Quickstart with Docker & GitHub Container Registry (GHCR)
+
+Every push to `main` automatically runs the test suite, builds the multi-stage Docker image ([`Dockerfile`](./Dockerfile)), and publishes it to **GitHub Container Registry (`ghcr.io/nayanjain24/fairflow:latest`)** via [`.github/workflows/docker-publish.yml`](./.github/workflows/docker-publish.yml).
+
+```bash
+# Option 1: Pull and run directly from GitHub Container Registry
+docker pull ghcr.io/nayanjain24/fairflow:latest
+docker run --rm --privileged -p 8000:8000 ghcr.io/nayanjain24/fairflow:latest
+
+# Option 2: Build and run locally with Docker Compose
+docker compose up --build
+```
+Then open **http://localhost:8000** for the FairFlow 3D Frontend (`/`, `/dashboard`, `/lab`, `/report`) and **http://localhost:8000/docs** for the FastAPI Swagger documentation.
 
 ## VM Workflow
 

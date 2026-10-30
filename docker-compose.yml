@@ -1,0 +1,19 @@
+services:
+  fairflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fairflow
+    ports:
+      - "8000:8000"
+    # Privileged / NET_ADMIN + SYS_ADMIN capabilities allow FairFlow to create
+    # Linux network namespaces (ff_client, ff_router, ff_server) and program
+    # real kernel tc HTB + fq_codel/CAKE qdiscs inside the container.
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    environment:
+      - PYTHONPATH=/app
+    restart: unless-stopped
+

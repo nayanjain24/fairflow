@@ -28,7 +28,8 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
 
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.fairflow.store import AuditStore
@@ -1865,6 +1866,20 @@ def create_app(
 
         bg_thread = threading.Thread(target=_background_control_loop, daemon=True, name="fairflow-control-loop")
         bg_thread.start()
+
+    # Serve compiled React production bundle (dist/) when available (e.g. inside Docker)
+    dist_dir = Path(__file__).resolve().parent.parent.parent / "dist"
+    if (dist_dir / "index.html").exists():
+        assets_dir = dist_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        def serve_spa(full_path: str) -> FileResponse:
+            candidate_file = (dist_dir / full_path).resolve()
+            if full_path and candidate_file.is_file() and str(candidate_file).startswith(str(dist_dir.resolve())):
+                return FileResponse(str(candidate_file))
+            return FileResponse(str(dist_dir / "index.html"))
 
     return app
 

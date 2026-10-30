@@ -1,0 +1,33 @@
+# Git and editor metadata
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+
+# Node / Frontend build artifacts (rebuilt cleanly in Stage 1)
+node_modules
+dist
+*.tsbuildinfo
+
+# Python caches and virtual environments
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.coverage
+htmlcov
+.venv
+venv
+ENV
+env
+
+# Environment secrets and runtime SQLite state
+.env
+.env.*
+!.env.example
+results/audit.db
+results/audit.db-shm
+results/audit.db-wal
+results/policy_reports
+

@@ -1,0 +1,112 @@
+{
+  "tcp_congestion_control": "cubic",
+  "tcp_rmem": "4096\t131072\t6291456",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "default_qdisc": "fq_codel",
+  "lscpu_raw": "Architecture:                            aarch64\nCPU op-mode(s):                          64-bit\nByte Order:                              Little Endian\nCPU(s):                                  6\nOn-line CPU(s) list:                     0-5\nVendor ID:                               Apple\nBIOS Vendor ID:                          QEMU\nModel name:                              -\nBIOS Model name:                         virt-8.2  CPU @ 2.0GHz\nBIOS CPU family:                         1\nModel:                                   0\nThread(s) per core:                      1\nCore(s) per socket:                      6\nSocket(s):                               1\nStepping:                                0x0\nBogoMIPS:                                48.00\nFlags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 asimdfhm dit uscat ilrcpc flagm sb paca pacg dcpodp flagm2 frint i8mm bf16 afp\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-5\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Vulnerable\nVulnerability Spectre v1:                Mitigation; __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; CSV2, but not BHB\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "offloads": {
+    "ff_client:ff_c_lan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    },
+    "ff_router:ff_r_lan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    },
+    "ff_router:ff_r_wan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    },
+    "ff_server:ff_s_wan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    }
+  },
+  "contract_sha256": "04893b27e604b38cd0fb0e6267b307d2f05447fcde333fd73f1743b9d5a499a8",
+  "arm": "B1_static_htb",
+  "trial": 2,
+  "qdisc_before": [
+    {
+      "kind": "htb",
+      "handle": "1:",
+      "root": true,
+      "refcnt": 7,
+      "options": {
+        "r2q": 100,
+        "default": "0x30",
+        "direct_packets_stat": 0,
+        "direct_qlen": 1000
+      }
+    },
+    {
+      "kind": "pfifo",
+      "handle": "30:",
+      "parent": "1:30",
+      "options": {
+        "limit": 1000
+      }
+    },
+    {
+      "kind": "pfifo",
+      "handle": "10:",
+      "parent": "1:10",
+      "options": {
+        "limit": 1000
+      }
+    },
+    {
+      "kind": "pfifo",
+      "handle": "20:",
+      "parent": "1:20",
+      "options": {
+        "limit": 1000
+      }
+    }
+  ],
+  "class_before": "class htb 1:1 root rate 95Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 0 bytes 0 pkt (dropped 0, overlimits 0 requeues 0) \n backlog 0b 0p requeues 0\n lended: 0 borrowed: 0 giants: 0\n tokens: 2106 ctokens: 2106\n\nclass htb 1:10 parent 1:1 leaf 10: prio 1 rate 2Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 0 bytes 0 pkt (dropped 0, overlimits 0 requeues 0) \n backlog 0b 0p requeues 0\n lended: 0 borrowed: 0 giants: 0\n tokens: 100000 ctokens: 2106\n\nclass htb 1:20 parent 1:1 leaf 20: prio 2 rate 8Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 0 bytes 0 pkt (dropped 0, overlimits 0 requeues 0) \n backlog 0b 0p requeues 0\n lended: 0 borrowed: 0 giants: 0\n tokens: 25000 ctokens: 2106\n\nclass htb 1:30 parent 1:1 leaf 30: prio 3 rate 2Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 0 bytes 0 pkt (dropped 0, overlimits 0 requeues 0) \n backlog 0b 0p requeues 0\n lended: 0 borrowed: 0 giants: 0\n tokens: 100000 ctokens: 2106\n\n",
+  "qdisc_after": [
+    {
+      "kind": "htb",
+      "handle": "1:",
+      "root": true,
+      "refcnt": 7,
+      "options": {
+        "r2q": 100,
+        "default": "0x30",
+        "direct_packets_stat": 0,
+        "direct_qlen": 1000
+      }
+    },
+    {
+      "kind": "pfifo",
+      "handle": "30:",
+      "parent": "1:30",
+      "options": {
+        "limit": 1000
+      }
+    },
+    {
+      "kind": "pfifo",
+      "handle": "10:",
+      "parent": "1:10",
+      "options": {
+        "limit": 1000
+      }
+    },
+    {
+      "kind": "pfifo",
+      "handle": "20:",
+      "parent": "1:20",
+      "options": {
+        "limit": 1000
+      }
+    }
+  ],
+  "class_after": "class htb 1:1 root rate 95Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 77161300 bytes 51549 pkt (dropped 0, overlimits 49673 requeues 0) \n backlog 0b 0p requeues 0\n lended: 49753 borrowed: 0 giants: 0\n tokens: 2013 ctokens: 2013\n\nclass htb 1:10 parent 1:1 leaf 10: prio 1 rate 2Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 139100 bytes 650 pkt (dropped 0, overlimits 0 requeues 0) \n backlog 0b 0p requeues 0\n lended: 650 borrowed: 0 giants: 0\n tokens: 86625 ctokens: 1824\n\nclass htb 1:20 parent 1:1 leaf 20: prio 2 rate 8Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 0 bytes 0 pkt (dropped 0, overlimits 0 requeues 0) \n backlog 0b 0p requeues 0\n lended: 0 borrowed: 0 giants: 0\n tokens: 25000 ctokens: 2106\n\nclass htb 1:30 parent 1:1 leaf 30: prio 3 rate 2Mbit ceil 95Mbit burst 1600b cburst 1600b \n Sent 77022200 bytes 50899 pkt (dropped 62, overlimits 31114 requeues 0) \n backlog 0b 0p requeues 0\n lended: 1146 borrowed: 49753 giants: 0\n tokens: 95625 ctokens: 2013\n\n",
+  "iperf_start_monotonic": 7058.027611429,
+  "iperf_end_monotonic": 7065.491914613
+}

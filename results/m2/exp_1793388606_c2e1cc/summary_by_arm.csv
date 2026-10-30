@@ -1,0 +1,5 @@
+arm,n_valid,n_total,interactive_target_met,added_delay_p99_median_ms,added_delay_p99_iqr_ms,added_delay_p99_ci95_low,added_delay_p99_ci95_high,added_delay_p99_cv,bulk_goodput_median_mbps,bulk_goodput_iqr_mbps,bulk_goodput_fraction_median,call_loss_median_pct
+R0_no_qos,2,2,0/2,199.441,0.002,199.439,199.444,0.0,95.311,0.108,0.953,0.0
+B1_static_htb,2,2,2/2,17.446,7.487,9.959,24.933,0.4292,90.807,0.0,0.908,0.0
+B2a_fq_codel,2,2,2/2,2.591,1.883,0.708,4.474,0.7267,87.553,0.108,0.876,0.0
+B2b_cake,2,2,2/2,0.76,0.078,0.681,0.838,0.1034,87.337,0.109,0.873,0.0

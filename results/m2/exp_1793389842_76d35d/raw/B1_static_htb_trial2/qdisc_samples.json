@@ -1,0 +1,1889 @@
+[
+  {
+    "monotonic_t": 84050.516070314,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84051.518149255,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 6210,
+        "packets": 31,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 214,
+        "qlen": 1
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 6210,
+        "packets": 31,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 6210,
+        "packets": 31,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 218,
+        "packets": 3,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 5992,
+        "packets": 28,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84052.520645602,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 17160,
+        "packets": 84,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 214,
+        "qlen": 1
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 17160,
+        "packets": 84,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 17284,
+        "packets": 84,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 378,
+        "packets": 5,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 16906,
+        "packets": 79,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84053.523026119,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 28074,
+        "packets": 135,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 28074,
+        "packets": 135,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 28074,
+        "packets": 135,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 468,
+        "packets": 6,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 27606,
+        "packets": 129,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84054.547203337,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 39402,
+        "packets": 192,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 214,
+        "qlen": 1
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 39402,
+        "packets": 192,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 39402,
+        "packets": 192,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 882,
+        "packets": 12,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 38520,
+        "packets": 180,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84055.561285682,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 3706826,
+        "packets": 2661,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 49962,
+        "qlen": 9
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 3706826,
+        "packets": 2661,
+        "drops": 0,
+        "overlimits": 5526,
+        "requeues": 0,
+        "backlog": 1514,
+        "qlen": 1
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 3711368,
+        "packets": 2664,
+        "drops": 0,
+        "overlimits": 4687,
+        "requeues": 0,
+        "backlog": 9084,
+        "qlen": 6
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 3661934,
+        "packets": 2433,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 9084,
+        "qlen": 6
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 49434,
+        "packets": 231,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84056.564033482,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 15460180,
+        "packets": 10468,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 195306,
+        "qlen": 17
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 15460180,
+        "packets": 10468,
+        "drops": 0,
+        "overlimits": 33430,
+        "requeues": 0,
+        "backlog": 1514,
+        "qlen": 1
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 15039288,
+        "packets": 10190,
+        "drops": 0,
+        "overlimits": 16850,
+        "requeues": 0,
+        "backlog": 434518,
+        "qlen": 287
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 14979154,
+        "packets": 9909,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 434518,
+        "qlen": 287
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 60134,
+        "packets": 281,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84057.568069829,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 27979548,
+        "packets": 18780,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 195520,
+        "qlen": 18
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 27979548,
+        "packets": 18780,
+        "drops": 0,
+        "overlimits": 63965,
+        "requeues": 0,
+        "backlog": 4542,
+        "qlen": 3
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 26962140,
+        "packets": 18108,
+        "drops": 0,
+        "overlimits": 30284,
+        "requeues": 0,
+        "backlog": 1029520,
+        "qlen": 680
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 26891306,
+        "packets": 17777,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 1029520,
+        "qlen": 680
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 70834,
+        "packets": 331,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84058.570740091,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 40359628,
+        "packets": 27000,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 128904,
+        "qlen": 25
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 40359628,
+        "packets": 27000,
+        "drops": 0,
+        "overlimits": 93973,
+        "requeues": 0,
+        "backlog": 3028,
+        "qlen": 2
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 38869852,
+        "packets": 26016,
+        "drops": 62,
+        "overlimits": 42079,
+        "requeues": 0,
+        "backlog": 1408020,
+        "qlen": 930
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 38788318,
+        "packets": 25635,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 1408020,
+        "qlen": 930
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 81534,
+        "packets": 381,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84059.573389312,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 51981130,
+        "packets": 34719,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 178866,
+        "qlen": 15
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 51981130,
+        "packets": 34719,
+        "drops": 0,
+        "overlimits": 121486,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 50775986,
+        "packets": 33923,
+        "drops": 62,
+        "overlimits": 53600,
+        "requeues": 0,
+        "backlog": 1124902,
+        "qlen": 743
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 50683752,
+        "packets": 33492,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 1124902,
+        "qlen": 743
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 92234,
+        "packets": 431,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84060.575990869,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 64025144,
+        "packets": 42718,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 190978,
+        "qlen": 15
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 64025144,
+        "packets": 42718,
+        "drops": 0,
+        "overlimits": 147700,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 62682226,
+        "packets": 41831,
+        "drops": 62,
+        "overlimits": 65548,
+        "requeues": 0,
+        "backlog": 1262676,
+        "qlen": 834
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 62579292,
+        "packets": 41350,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 1262676,
+        "qlen": 834
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 102934,
+        "packets": 481,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84061.593425996,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 76216188,
+        "packets": 50814,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 178933,
+        "qlen": 16
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 76216188,
+        "packets": 50814,
+        "drops": 0,
+        "overlimits": 173892,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 74761234,
+        "packets": 49853,
+        "drops": 62,
+        "overlimits": 78847,
+        "requeues": 0,
+        "backlog": 1373198,
+        "qlen": 907
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 74647386,
+        "packets": 49321,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 1373198,
+        "qlen": 907
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 113848,
+        "packets": 532,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84062.595799019,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 78747862,
+        "packets": 52535,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 214,
+        "qlen": 1
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 78747862,
+        "packets": 52535,
+        "drops": 0,
+        "overlimits": 180481,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 78653994,
+        "packets": 52473,
+        "drops": 62,
+        "overlimits": 82685,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 78529446,
+        "packets": 51891,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 124548,
+        "packets": 582,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84063.598480575,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 78758562,
+        "packets": 52585,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 214,
+        "qlen": 1
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 78758562,
+        "packets": 52585,
+        "drops": 0,
+        "overlimits": 180481,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 78664694,
+        "packets": 52523,
+        "drops": 62,
+        "overlimits": 82685,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 78529446,
+        "packets": 51891,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 135248,
+        "packets": 632,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84064.64239131,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 78762414,
+        "packets": 52603,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 78762414,
+        "packets": 52603,
+        "drops": 0,
+        "overlimits": 180481,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 78668616,
+        "packets": 52542,
+        "drops": 62,
+        "overlimits": 82685,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 78529516,
+        "packets": 51892,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 139100,
+        "packets": 650,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84065.708198119,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 78762414,
+        "packets": 52603,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 78762414,
+        "packets": 52603,
+        "drops": 0,
+        "overlimits": 180481,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 78668616,
+        "packets": 52542,
+        "drops": 62,
+        "overlimits": 82685,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 78529516,
+        "packets": 51892,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 139100,
+        "packets": 650,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  },
+  {
+    "monotonic_t": 84066.718847071,
+    "ff_server:ff_s_wan": [
+      {
+        "kind": "netem",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.015,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 78762484,
+        "packets": 52604,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "tbf",
+        "handle": "2:",
+        "parent": "1:",
+        "options": {
+          "rate": 12500000,
+          "burst": 4096,
+          "lat": 199672
+        },
+        "bytes": 78762484,
+        "packets": 52604,
+        "drops": 0,
+        "overlimits": 180481,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ff_router:ff_r_lan": [
+      {
+        "kind": "htb",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 7,
+        "options": {
+          "r2q": 100,
+          "default": "0x30",
+          "direct_packets_stat": 0,
+          "direct_qlen": 1000
+        },
+        "bytes": 78668616,
+        "packets": 52542,
+        "drops": 62,
+        "overlimits": 82685,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "30:",
+        "parent": "1:30",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 78529516,
+        "packets": 51892,
+        "drops": 62,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "10:",
+        "parent": "1:10",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 139100,
+        "packets": 650,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "pfifo",
+        "handle": "20:",
+        "parent": "1:20",
+        "options": {
+          "limit": 1000
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ]
+  }
+]

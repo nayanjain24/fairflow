@@ -1,0 +1,231 @@
+{
+	"start":	{
+		"connected":	[{
+				"socket":	5,
+				"local_host":	"10.0.1.2",
+				"local_port":	44618,
+				"remote_host":	"10.0.2.2",
+				"remote_port":	5201
+			}],
+		"version":	"iperf 3.16",
+		"system_info":	"Linux fairflow 6.8.0-147-generic #147-Ubuntu SMP PREEMPT_DYNAMIC Thu Sep 24 11:39:52 UTC 2026 aarch64",
+		"timestamp":	{
+			"time":	"Thu, 29 Oct 2026 18:05:43 GMT",
+			"timesecs":	1793297143
+		},
+		"connecting_to":	{
+			"host":	"10.0.2.2",
+			"port":	5201
+		},
+		"cookie":	"cculp6qc5wrdra5r7j6neeect5x24qsjlhxg",
+		"tcp_mss_default":	1448,
+		"target_bitrate":	0,
+		"fq_rate":	0,
+		"sock_bufsize":	0,
+		"sndbuf_actual":	16384,
+		"rcvbuf_actual":	131072,
+		"test_start":	{
+			"protocol":	"TCP",
+			"num_streams":	1,
+			"blksize":	131072,
+			"omit":	0,
+			"duration":	7,
+			"bytes":	0,
+			"blocks":	0,
+			"reverse":	1,
+			"tos":	0,
+			"target_bitrate":	0,
+			"bidir":	0,
+			"fqrate":	0
+		}
+	},
+	"intervals":	[{
+			"streams":	[{
+					"socket":	5,
+					"start":	0,
+					"end":	1.001002,
+					"seconds":	1.0010019540786743,
+					"bytes":	3538944,
+					"bits_per_second":	28283213.518856764,
+					"omitted":	false,
+					"sender":	false
+				}],
+			"sum":	{
+				"start":	0,
+				"end":	1.001002,
+				"seconds":	1.0010019540786743,
+				"bytes":	3538944,
+				"bits_per_second":	28283213.518856764,
+				"omitted":	false,
+				"sender":	false
+			}
+		}, {
+			"streams":	[{
+					"socket":	5,
+					"start":	1.001002,
+					"end":	2.000997,
+					"seconds":	0.999994993209839,
+					"bytes":	10878976,
+					"bits_per_second":	87032243.752181724,
+					"omitted":	false,
+					"sender":	false
+				}],
+			"sum":	{
+				"start":	1.001002,
+				"end":	2.000997,
+				"seconds":	0.999994993209839,
+				"bytes":	10878976,
+				"bits_per_second":	87032243.752181724,
+				"omitted":	false,
+				"sender":	false
+			}
+		}, {
+			"streams":	[{
+					"socket":	5,
+					"start":	2.000997,
+					"end":	3.000972,
+					"seconds":	0.999975025653839,
+					"bytes":	11272192,
+					"bits_per_second":	90179788.181246758,
+					"omitted":	false,
+					"sender":	false
+				}],
+			"sum":	{
+				"start":	2.000997,
+				"end":	3.000972,
+				"seconds":	0.999975025653839,
+				"bytes":	11272192,
+				"bits_per_second":	90179788.181246758,
+				"omitted":	false,
+				"sender":	false
+			}
+		}, {
+			"streams":	[{
+					"socket":	5,
+					"start":	3.000972,
+					"end":	4.000979,
+					"seconds":	1.0000070333480835,
+					"bytes":	10092544,
+					"bits_per_second":	80739784.128994033,
+					"omitted":	false,
+					"sender":	false
+				}],
+			"sum":	{
+				"start":	3.000972,
+				"end":	4.000979,
+				"seconds":	1.0000070333480835,
+				"bytes":	10092544,
+				"bits_per_second":	80739784.128994033,
+				"omitted":	false,
+				"sender":	false
+			}
+		}, {
+			"streams":	[{
+					"socket":	5,
+					"start":	4.000979,
+					"end":	5.001051,
+					"seconds":	1.0000720024108887,
+					"bytes":	6029312,
+					"bits_per_second":	48231023.250046372,
+					"omitted":	false,
+					"sender":	false
+				}],
+			"sum":	{
+				"start":	4.000979,
+				"end":	5.001051,
+				"seconds":	1.0000720024108887,
+				"bytes":	6029312,
+				"bits_per_second":	48231023.250046372,
+				"omitted":	false,
+				"sender":	false
+			}
+		}, {
+			"streams":	[{
+					"socket":	5,
+					"start":	5.001051,
+					"end":	6.010201,
+					"seconds":	1.00915002822876,
+					"bytes":	0,
+					"bits_per_second":	0,
+					"omitted":	false,
+					"sender":	false
+				}],
+			"sum":	{
+				"start":	5.001051,
+				"end":	6.010201,
+				"seconds":	1.00915002822876,
+				"bytes":	0,
+				"bits_per_second":	0,
+				"omitted":	false,
+				"sender":	false
+			}
+		}, {
+			"streams":	[{
+					"socket":	5,
+					"start":	6.010201,
+					"end":	7.070639,
+					"seconds":	1.06043803691864,
+					"bytes":	0,
+					"bits_per_second":	0,
+					"omitted":	false,
+					"sender":	false
+				}],
+			"sum":	{
+				"start":	6.010201,
+				"end":	7.070639,
+				"seconds":	1.06043803691864,
+				"bytes":	0,
+				"bits_per_second":	0,
+				"omitted":	false,
+				"sender":	false
+			}
+		}],
+	"end":	{
+		"streams":	[{
+				"sender":	{
+					"socket":	5,
+					"start":	0,
+					"end":	7.070639,
+					"seconds":	7.070639,
+					"bytes":	0,
+					"bits_per_second":	0,
+					"sender":	false
+				},
+				"receiver":	{
+					"socket":	5,
+					"start":	0,
+					"end":	7.070639,
+					"seconds":	7.070639,
+					"bytes":	41811968,
+					"bits_per_second":	47307710.660945922,
+					"sender":	false
+				}
+			}],
+		"sum_sent":	{
+			"start":	0,
+			"end":	7.070639,
+			"seconds":	7.070639,
+			"bytes":	0,
+			"bits_per_second":	0,
+			"sender":	false
+		},
+		"sum_received":	{
+			"start":	0,
+			"end":	7.070639,
+			"seconds":	7.070639,
+			"bytes":	41811968,
+			"bits_per_second":	47307710.660945922,
+			"sender":	false
+		},
+		"cpu_utilization_percent":	{
+			"host_total":	1.2755197009340808,
+			"host_user":	0.0982226847589398,
+			"host_system":	1.177297016175141,
+			"remote_total":	0,
+			"remote_user":	0,
+			"remote_system":	0
+		},
+		"receiver_tcp_congestion":	"cubic"
+	},
+	"error":	"unable to send control message - port may not be available, the other side may have stopped running, etc.: Broken pipe"
+}

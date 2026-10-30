@@ -1,0 +1,12 @@
+{
+  "scenario": "scenario_b",
+  "run_id": "scenario_b_20261029_175134",
+  "total_packets": 601,
+  "pre_collapse_p50_delay_ms": 15.24,
+  "pre_collapse_p95_delay_ms": 15.96,
+  "pre_collapse_tput_mbps": 80.03,
+  "post_collapse_p50_delay_ms": 15.04,
+  "post_collapse_p95_delay_ms": 16.2,
+  "post_collapse_tput_mbps": 0.0,
+  "capacity_collapse_adapted": true
+}

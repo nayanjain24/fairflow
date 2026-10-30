@@ -1,0 +1,153 @@
+Beginning M2 SMOKE run: 8 total trials across 4 arms.
+Schedule: [('B2a_fq_codel', 1), ('B2b_cake', 1), ('B1_static_htb', 1), ('R0_no_qos', 1), ('B1_static_htb', 2), ('R0_no_qos', 2), ('B2a_fq_codel', 2), ('B2b_cake', 2)]
+
+======================================================================
+RUNNING TRIAL: B2a_fq_codel (Trial 1/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/B2a_fq_codel_trial1
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.317s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (B2a_fq_codel #1):
+  Valid: True 
+  Added Delay p99: 1.075 ms (Target <= 30 ms: True)
+  Bulk Goodput: 87.45 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+RUNNING TRIAL: B2b_cake (Trial 1/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/B2b_cake_trial1
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.292s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (B2b_cake #1):
+  Valid: True 
+  Added Delay p99: 0.855 ms (Target <= 30 ms: True)
+  Bulk Goodput: 87.239 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+RUNNING TRIAL: B1_static_htb (Trial 1/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/B1_static_htb_trial1
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.314s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (B1_static_htb #1):
+  Valid: True 
+  Added Delay p99: 17.965 ms (Target <= 30 ms: True)
+  Bulk Goodput: 90.594 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+RUNNING TRIAL: R0_no_qos (Trial 1/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/R0_no_qos_trial1
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.528s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (R0_no_qos #1):
+  Valid: True 
+  Added Delay p99: 199.569 ms (Target <= 30 ms: False)
+  Bulk Goodput: 95.213 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+RUNNING TRIAL: B1_static_htb (Trial 2/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/B1_static_htb_trial2
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.362s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (B1_static_htb #2):
+  Valid: True 
+  Added Delay p99: 23.955 ms (Target <= 30 ms: True)
+  Bulk Goodput: 90.801 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+RUNNING TRIAL: R0_no_qos (Trial 2/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/R0_no_qos_trial2
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.497s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (R0_no_qos #2):
+  Valid: True 
+  Added Delay p99: 199.508 ms (Target <= 30 ms: False)
+  Bulk Goodput: 94.998 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+RUNNING TRIAL: B2a_fq_codel (Trial 2/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/B2a_fq_codel_trial2
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.328s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (B2a_fq_codel #2):
+  Valid: True 
+  Added Delay p99: 0.0 ms (Target <= 30 ms: True)
+  Bulk Goodput: 87.649 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+RUNNING TRIAL: B2b_cake (Trial 2/2)
+Output directory: /home/ubuntu/fairflow/results/m2/smoke_20261026_151016/raw/B2b_cake_trial2
+======================================================================
+Phase 1: Baseline call traffic (3.0s)...
+Phase 2: Congested call + download (7.0s)...
+Observed download duration: 7.271s
+Phase 3: Tail recovery call traffic (3.0s)...
+Trial Results (B2b_cake #2):
+  Valid: True 
+  Added Delay p99: 0.802 ms (Target <= 30 ms: True)
+  Bulk Goodput: 87.244 Mbps (Floor >= 2.0 Mbps: True)
+  Call Loss: 0.0%
+Cooldown for 5.0s...
+
+======================================================================
+EXPERIMENT RUN COMPLETE
+======================================================================
+# FairFlow M2 Scenario A Report: scenario_a_baselines
+
+- **Run ID**: `smoke_20261026_151016`
+- **Mode**: `smoke`
+- **Timestamp UTC**: `2026-10-26T15:13:07.516865+00:00`
+- **Kernel**: `Linux 6.8 (Ubuntu 24.04 aarch64)`
+- **TCP Congestion Control**: `cubic`
+- **Contract SHA256**: `04893b27e604b38cd0fb0e6267b307d2f05447fcde333fd73f1743b9d5a499a8`
+
+## 1. Primary & Secondary Metrics Summary
+
+| Arm | Valid Trials | Target Met (k/N) | Added Delay p99 Median (ms) | Added Delay p99 IQR (ms) | 95% Bootstrap CI (ms) | Added Delay CV | Bulk Goodput Median (Mbps) | Goodput Fraction | Call Loss Median (%) |
+|---|---|---|---|---|---|---|---|---|---|
+| `R0_no_qos` | 2/2 | **0/2** | 199.54 | 0.03 | [199.508, 199.569] | 0.000 | 95.11 | 95.10% | 0.00% |
+| `B1_static_htb` | 2/2 | **2/2** | 20.96 | 3.00 | [17.965, 23.955] | 0.143 | 90.70 | 90.70% | 0.00% |
+| `B2a_fq_codel` | 2/2 | **2/2** | 0.54 | 0.54 | [0.0, 1.075] | 1.000 | 87.55 | 87.50% | 0.00% |
+| `B2b_cake` | 2/2 | **2/2** | 0.83 | 0.03 | [0.802, 0.855] | 0.032 | 87.24 | 87.20% | 0.00% |
+
+## 2. Safety Contract Adherence
+
+| Arm | Interactive Added Delay Target <= 30 ms | Bulk Floor >= 2.0 Mbps | Status |
+|---|---|---|---|
+| `R0_no_qos` | FAIL (199.54 ms) | PASS (95.11 Mbps) | **NON-COMPLIANT** |
+| `B1_static_htb` | PASS (20.96 ms) | PASS (90.70 Mbps) | **COMPLIANT** |
+| `B2a_fq_codel` | PASS (0.54 ms) | PASS (87.55 Mbps) | **COMPLIANT** |
+| `B2b_cake` | PASS (0.83 ms) | PASS (87.24 Mbps) | **COMPLIANT** |
+

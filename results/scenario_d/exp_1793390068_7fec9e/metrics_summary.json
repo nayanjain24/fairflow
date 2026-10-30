@@ -1,0 +1,12 @@
+{
+  "scenario": "scenario_d",
+  "run_id": "exp_1793390068_7fec9e",
+  "harmful_policy_infeasible_rejected": true,
+  "rejection_reasons": [
+    "Safety contract violation: 'interactive' floor (0.50 Mbps) is below contract floor (2.00 Mbps)"
+  ],
+  "canary_breach_detected": true,
+  "automated_rollback_executed": true,
+  "coordinator_final_state": "ROLLED_BACK",
+  "kernel_restoration_verified": true
+}

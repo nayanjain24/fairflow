@@ -1,0 +1,204 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #06051a;
+  --panel: rgba(255, 255, 255, 0.04);
+  --line: rgba(160, 140, 255, 0.16);
+  --text: #f1efff;
+  --mute: #8f8ab3;
+  --accent: #7c5cff;
+  --accent-2: #b79bff;
+  --pink: #ff8fb8;
+  --safety: #f26a1b;
+  --navy: #0f2347;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  scroll-behavior: auto;
+}
+
+/* Visible accessible keyboard focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Glass Card System */
+.glass-card {
+  background: linear-gradient(
+      135deg,
+      rgba(124, 92, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.03) 38%,
+      rgba(255, 255, 255, 0.015) 100%
+    ),
+    var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px -15px rgba(4, 3, 18, 0.78),
+    inset 0 1px 0 0 rgba(183, 155, 255, 0.16);
+}
+
+.glass-card-safety {
+  background: linear-gradient(
+      145deg,
+      rgba(15, 35, 71, 0.92) 0%,
+      rgba(10, 24, 52, 0.85) 60%,
+      rgba(8, 18, 40, 0.94) 100%
+    );
+  border: 1px solid rgba(160, 140, 255, 0.18);
+  border-radius: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px -15px rgba(2, 6, 18, 0.85),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.glass-card-safety-orange {
+  background: linear-gradient(
+      145deg,
+      rgba(242, 106, 27, 0.12) 0%,
+      rgba(15, 35, 71, 0.92) 45%,
+      rgba(10, 22, 48, 0.95) 100%
+    );
+  border: 1.5px solid #f26a1b;
+  border-radius: 26px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 55px -12px rgba(242, 106, 27, 0.22),
+    inset 0 1px 0 0 rgba(242, 106, 27, 0.35);
+}
+
+/* Pill Buttons */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.75rem 1.6rem;
+  font-weight: 500;
+  font-size: 0.925rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7c5cff 0%, #9b7aff 60%, #b79bff 100%);
+  box-shadow: 0 0 28px rgba(124, 92, 255, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(183, 155, 255, 0.45);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 38px rgba(124, 92, 255, 0.68),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  filter: brightness(1.06);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  font-size: 0.925rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(124, 92, 255, 0.14);
+  border-color: rgba(183, 155, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-safety {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.65rem 1.35rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, #f26a1b 0%, #ff833a 100%);
+  box-shadow: 0 0 24px rgba(242, 106, 27, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 160, 105, 0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-safety:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 32px rgba(242, 106, 27, 0.65);
+}
+
+/* Faint perspective grid floor under hero visual */
+.hero-perspective-floor {
+  background-image: linear-gradient(to right, rgba(160, 140, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(160, 140, 255, 0.12) 1px, transparent 1px);
+  background-size: 48px 48px;
+  transform: perspective(650px) rotateX(68deg) scale(1.6);
+  transform-origin: center top;
+  mask-image: radial-gradient(ellipse 65% 65% at 50% 35%, black 15%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 35%, black 15%, transparent 78%);
+}
+
+/* Flash animation for rolled-back items */
+@keyframes safety-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(242, 106, 27, 0), inset 0 0 18px rgba(242, 106, 27, 0.16);
+    border-color: rgba(242, 106, 27, 0.65);
+  }
+  50% {
+    box-shadow: 0 0 26px 2px rgba(242, 106, 27, 0.35), inset 0 0 28px rgba(242, 106, 27, 0.28);
+    border-color: #f26a1b;
+  }
+}
+
+.rollback-flash {
+  animation: safety-pulse 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print styles for Report Export-to-PDF */
+@media print {
+  body {
+    background: #06051a !important;
+    color: #f1efff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+

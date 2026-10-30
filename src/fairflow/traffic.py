@@ -186,13 +186,24 @@ class UDPCallSender:
         t_start = time.monotonic()
         t_end = t_start + duration_s
         next_send = t_start
+        self.latenesses_ms = []
 
         try:
             while next_send < t_end:
-                now = time.monotonic()
-                sleep_time = next_send - now
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
+                # Sleep in short chunks (1ms) to avoid hypervisor thread descheduling
+                while True:
+                    rem = next_send - time.monotonic()
+                    if rem <= 0.0015:
+                        break
+                    time.sleep(0.001)
+
+                # Fine-grained spin for remaining microsecond precision
+                while time.monotonic() < next_send:
+                    pass
+
+                actual_monotonic = time.monotonic()
+                lateness_ms = (actual_monotonic - next_send) * 1000.0
+                self.latenesses_ms.append(lateness_ms)
 
                 send_time_ns = time.monotonic_ns()
                 packet = pack_call_packet(seq=seq, send_time_ns=send_time_ns, payload_len=self.payload_len)
@@ -203,6 +214,14 @@ class UDPCallSender:
             sock.close()
 
         return seq
+
+    @property
+    def p99_lateness_ms(self) -> float:
+        """Return 99th percentile sender scheduling lateness in milliseconds."""
+        if not getattr(self, "latenesses_ms", None):
+            return 0.0
+        sorted_lat = sorted(self.latenesses_ms)
+        return sorted_lat[int(0.99 * len(sorted_lat))]
 
 
 class UDPCallReceiver:

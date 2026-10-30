@@ -1,0 +1,14 @@
+{
+  "scenario": "scenario_c",
+  "run_id": "scenario_c_20261029_175219",
+  "stream_throughputs_mbps": [
+    30.3,
+    29.15,
+    29.78
+  ],
+  "jain_fairness_index": 0.9998,
+  "gaming_p50_delay_ms": 15.17,
+  "gaming_p95_delay_ms": 25.29,
+  "gaming_sample_count": 667,
+  "fairness_target_met": true
+}

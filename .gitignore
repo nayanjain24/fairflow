@@ -1,8 +1,12 @@
 # Environment and secret files
 .env
 .env.*
+!.env.example
 *.key
 *.pem
+
+# TypeScript / Vite build info
+*.tsbuildinfo
 
 # Python artifacts
 __pycache__/
@@ -50,9 +54,14 @@ htmlcov/
 
 # Testbed / temporary runtime state
 *.pcap
+results/audit.db
+results/audit.db-shm
+results/audit.db-wal
+results/policy_reports/
 results/*.csv
 results/*.png
 results/*_sent.txt
 !results/.gitkeep
 !results/*.json
 !results/vm_verification_*.txt
+node_modules

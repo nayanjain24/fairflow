@@ -1,0 +1,46 @@
+# experiments/scenario_c.yaml — Scenario C: Multi-flow Streaming + Gaming Fairness
+version: 1
+scenario_name: "scenario_c_fairness"
+
+namespaces:
+  client: "ff_client"
+  router: "ff_router"
+  server: "ff_server"
+
+links:
+  lan:
+    endpoint_a:
+      namespace: "ff_client"
+      interface: "ff_c_lan"
+      ip: "10.0.1.2/24"
+    endpoint_b:
+      namespace: "ff_router"
+      interface: "ff_r_lan"
+      ip: "10.0.1.1/24"
+  wan:
+    endpoint_a:
+      namespace: "ff_router"
+      interface: "ff_r_wan"
+      ip: "10.0.2.1/24"
+    endpoint_b:
+      namespace: "ff_server"
+      interface: "ff_s_wan"
+      ip: "10.0.2.2/24"
+
+routes:
+  - namespace: "ff_client"
+    destination: "10.0.2.0/24"
+    gateway: "10.0.1.1"
+  - namespace: "ff_server"
+    destination: "10.0.1.0/24"
+    gateway: "10.0.2.1"
+
+bottleneck:
+  interface: "ff_s_wan"
+  namespace: "ff_server"
+  capacity_mbps: 100.0
+  base_one_way_delay_ms: 15.0
+
+traffic:
+  bulk_streams: 3
+  gaming_port: 5005

@@ -10,9 +10,11 @@ All other interfaces (e.g., eth0, wlan0, lo) are strictly rejected.
 """
 
 import json
+import os
 import re
 import subprocess
-from typing import List, Dict, Any, Optional, Protocol
+import sys
+from typing import List, Dict, Any, Optional, Protocol, Sequence
 from src.fairflow.policy import Policy
 
 
@@ -69,6 +71,11 @@ class CommandRunner(Protocol):
 class SystemCommandRunner:
     """Default command runner invoking real system commands via subprocess."""
 
+    PRIVILEGED_BINARIES = frozenset({"ip", "tc", "ethtool", "sysctl"})
+
+    def __init__(self, use_sudo_if_non_root: bool = False) -> None:
+        self.use_sudo_if_non_root = use_sudo_if_non_root
+
     def run(self, cmd: List[str], check: bool = True) -> tuple[str, str, int]:
         """Execute command via subprocess.run using argument lists with shell=False.
 
@@ -84,12 +91,46 @@ class SystemCommandRunner:
         if not isinstance(cmd, list) or not all(isinstance(arg, str) for arg in cmd):
             raise TypeError(f"cmd must be a list of strings, got {cmd!r}")
 
-        proc = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+        exec_cmd = cmd
+        if (
+            self.use_sudo_if_non_root
+            and sys.platform == "linux"
+            and os.geteuid() != 0
+            and cmd
+            and cmd[0] in self.PRIVILEGED_BINARIES
+        ):
+            exec_cmd = ["sudo", "-n"] + cmd
+
+        proc = subprocess.run(exec_cmd, capture_output=True, text=True, shell=False)
         if check and proc.returncode != 0:
             raise RuntimeError(
                 f"Command '{' '.join(cmd)}' failed with code {proc.returncode}: {proc.stderr.strip()}"
             )
         return proc.stdout, proc.stderr, proc.returncode
+
+
+class MockCommandRunner:
+    """Mock command runner for tests and non-Linux/dry-run environments."""
+
+    def __init__(self, responses: Optional[Dict[str, tuple[str, str, int]]] = None) -> None:
+        self.commands: List[List[str]] = []
+        self.responses: Dict[str, tuple[str, str, int]] = responses or {}
+
+    def run(self, cmd: List[str], check: bool = True) -> tuple[str, str, int]:
+        if not isinstance(cmd, list) or not all(isinstance(arg, str) for arg in cmd):
+            raise TypeError(f"cmd must be a list of strings, got {cmd!r}")
+        self.commands.append(cmd)
+        cmd_str = " ".join(cmd)
+        for pattern, resp in self.responses.items():
+            if pattern in cmd_str:
+                if check and resp[2] != 0:
+                    raise RuntimeError(f"Command '{cmd_str}' failed with code {resp[2]}: {resp[1]}")
+                return resp
+        if "tc -j qdisc show" in cmd_str or "tc -s -j qdisc show" in cmd_str:
+            return ('[{"kind": "htb", "handle": "1:", "bytes": 1000, "drops": 0}]', "", 0)
+        if "tc -j class show" in cmd_str:
+            return ('[{"classid": "1:10", "rate": "15Mbit"}]', "", 0)
+        return ("", "", 0)
 
 
 class TCDriver:
@@ -140,6 +181,31 @@ class TCDriver:
             return [parsed]
         except json.JSONDecodeError as err:
             raise RuntimeError(f"Failed to parse tc JSON output: {stdout!r}") from err
+
+    def snapshot_classes(self, interface: str, namespace: str) -> List[Dict[str, Any]]:
+        """Capture the current class state of an interface as JSON.
+
+        Inputs:
+            interface: Name of the interface (must start with 'ff_').
+            namespace: Name of the namespace (must start with 'ff_').
+        Outputs:
+            Parsed JSON array representing current classes.
+        """
+        validate_interface_name(interface)
+        validate_namespace_name(namespace)
+
+        cmd = ["ip", "netns", "exec", namespace, "tc", "-j", "class", "show", "dev", interface]
+        stdout, stderr, code = self.runner.run(cmd, check=True)
+        trimmed = stdout.strip()
+        if not trimmed:
+            return []
+        try:
+            parsed = json.loads(trimmed)
+            if isinstance(parsed, list):
+                return parsed
+            return [parsed]
+        except json.JSONDecodeError as err:
+            raise RuntimeError(f"Failed to parse tc class JSON output: {stdout!r}") from err
 
     def apply(self, interface: str, namespace: str, policy: Policy) -> List[List[str]]:
         """Apply a QoS Policy object to the specified emulated interface.
@@ -292,3 +358,202 @@ class TCDriver:
             # We don't check=True here because deleting a non-existent qdisc returns error 2
             self.runner.run(cmd, check=False)
         return [cmd]
+
+    def snapshot_stats(self, interface: str, namespace: str) -> List[Dict[str, Any]]:
+        """Capture live qdisc statistics including bytes, packets, drops, overlimits, and backlog via tc -s -j."""
+        validate_interface_name(interface)
+        validate_namespace_name(namespace)
+
+        cmd = ["ip", "netns", "exec", namespace, "tc", "-s", "-j", "qdisc", "show", "dev", interface]
+        stdout, _, _ = self.runner.run(cmd, check=False)
+        trimmed = stdout.strip()
+        if not trimmed:
+            return []
+        try:
+            parsed = json.loads(trimmed)
+            return parsed if isinstance(parsed, list) else [parsed]
+        except json.JSONDecodeError:
+            return []
+
+    def snapshot_class_stats(self, interface: str, namespace: str) -> List[Dict[str, Any]]:
+        """Capture live HTB class statistics via tc -s -j class show."""
+        validate_interface_name(interface)
+        validate_namespace_name(namespace)
+
+        cmd = ["ip", "netns", "exec", namespace, "tc", "-s", "-j", "class", "show", "dev", interface]
+        stdout, _, _ = self.runner.run(cmd, check=False)
+        trimmed = stdout.strip()
+        if not trimmed:
+            return []
+        try:
+            parsed = json.loads(trimmed)
+            return parsed if isinstance(parsed, list) else [parsed]
+        except json.JSONDecodeError:
+            return []
+
+    def apply_flow_filters(
+        self,
+        interface: str,
+        namespace: str,
+        user_intents: Optional[Sequence[Any]] = None,
+    ) -> List[List[str]]:
+        """Install kernel u32 packet classification filters steering traffic into HTB classes 1:10, 1:20, 1:30.
+
+        Priority 1: UserIntent explicit overrides (ports / IPs).
+        Priority 2: DSCP EF (46 -> TOS 0xb8) & Interactive UDP ports (5004, 5005, 27015) -> 1:10.
+        Priority 3: DSCP AF31 (26 -> TOS 0x68) & Streaming TCP/UDP ports (1935, 8080) -> 1:20.
+        Default (unmatched): Routed to 1:30 (bulk) via HTB default 30.
+        """
+        validate_interface_name(interface)
+        validate_namespace_name(namespace)
+
+        ns_prefix = ["ip", "netns", "exec", namespace]
+        commands: List[List[str]] = []
+
+        # 1. Clear existing root filters on 1: so stale overrides don't persist
+        del_cmd = ns_prefix + ["tc", "filter", "del", "dev", interface, "parent", "1:"]
+        commands.append(del_cmd)
+        if not self.dry_run:
+            self.runner.run(del_cmd, check=False)
+
+        filter_cmds: List[List[str]] = []
+
+        # 2. UserIntent overrides (highest filter priority = 1)
+        if user_intents:
+            for intent in user_intents:
+                target_cls = getattr(intent, "target_class", "bulk")
+                cid = self.CLASS_IDS.get(target_cls, 30)
+                proto_name = (getattr(intent, "protocol", None) or "").lower()
+                src_port = getattr(intent, "src_port", None)
+                dst_port = getattr(intent, "dst_port", None)
+
+                match_args: List[str] = []
+                if proto_name == "udp":
+                    match_args.extend(["match", "ip", "protocol", "17", "0xff"])
+                elif proto_name == "tcp":
+                    match_args.extend(["match", "ip", "protocol", "6", "0xff"])
+
+                if src_port is not None and 1 <= int(src_port) <= 65535:
+                    match_args.extend(["match", "ip", "sport", str(int(src_port)), "0xffff"])
+                if dst_port is not None and 1 <= int(dst_port) <= 65535:
+                    match_args.extend(["match", "ip", "dport", str(int(dst_port)), "0xffff"])
+
+                if match_args:
+                    filter_cmds.append(
+                        ns_prefix
+                        + [
+                            "tc",
+                            "filter",
+                            "add",
+                            "dev",
+                            interface,
+                            "parent",
+                            "1:",
+                            "protocol",
+                            "ip",
+                            "prio",
+                            "1",
+                            "u32",
+                        ]
+                        + match_args
+                        + ["flowid", f"1:{cid}"]
+                    )
+
+        # 3. Standard interactive rules -> class 1:10 (prio 2)
+        for port in (5004, 5005, 27015):
+            for port_flag in ("dport", "sport"):
+                filter_cmds.append(
+                    ns_prefix
+                    + [
+                        "tc",
+                        "filter",
+                        "add",
+                        "dev",
+                        interface,
+                        "parent",
+                        "1:",
+                        "protocol",
+                        "ip",
+                        "prio",
+                        "2",
+                        "u32",
+                        "match",
+                        "ip",
+                        "protocol",
+                        "17",
+                        "0xff",
+                        "match",
+                        "ip",
+                        port_flag,
+                        str(port),
+                        "0xffff",
+                        "flowid",
+                        "1:10",
+                    ]
+                )
+
+        # DSCP EF (46 << 2 = 184 = 0xb8) -> class 1:10
+        filter_cmds.append(
+            ns_prefix
+            + [
+                "tc",
+                "filter",
+                "add",
+                "dev",
+                interface,
+                "parent",
+                "1:",
+                "protocol",
+                "ip",
+                "prio",
+                "2",
+                "u32",
+                "match",
+                "ip",
+                "tos",
+                "0xb8",
+                "0xfc",
+                "flowid",
+                "1:10",
+            ]
+        )
+
+        # 4. Standard streaming rules -> class 1:20 (prio 3)
+        for port in (1935, 8080):
+            for port_flag in ("sport", "dport"):
+                filter_cmds.append(
+                    ns_prefix
+                    + [
+                        "tc",
+                        "filter",
+                        "add",
+                        "dev",
+                        interface,
+                        "parent",
+                        "1:",
+                        "protocol",
+                        "ip",
+                        "prio",
+                        "3",
+                        "u32",
+                        "match",
+                        "ip",
+                        "protocol",
+                        "6",
+                        "0xff",
+                        "match",
+                        "ip",
+                        port_flag,
+                        str(port),
+                        "0xffff",
+                        "flowid",
+                        "1:20",
+                    ]
+                )
+
+        if not self.dry_run:
+            for cmd in filter_cmds:
+                self.runner.run(cmd, check=False)
+
+        commands.extend(filter_cmds)
+        return commands

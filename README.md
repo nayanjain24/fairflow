@@ -50,3 +50,51 @@ All output is teed to `results/vm_verification_<timestamp>.txt`.
 - Interfaces touched must start with `ff_*` (max 15 chars) inside network namespaces.
 - All numbers, plots, and percentages must originate from raw log analysis.
 - `contract.yaml` is authored and maintained by the user.
+
+---
+
+## Production Frontend (React + Vite + TypeScript)
+
+The FairFlow web frontend is located in `src/{pages,components,scene,charts,api,hooks,styles}` and communicates with the FastAPI backend (`src/fairflow/api.py`).
+
+### 1. Install & Run Instructions
+
+```bash
+# 1. Install frontend dependencies
+npm install
+
+# 2. (Optional) Start the FastAPI backend inside the Multipass VM
+./scripts/vm.sh uvicorn src.fairflow.api:app --host 0.0.0.0 --port 8000
+
+# 3. Start the Vite development server
+npm run dev
+
+# 4. Build for production
+npm run build
+```
+
+### 2. Environment Variables (`.env`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_URL` | `http://192.168.252.2:8000` (or `http://127.0.0.1:8000`) | Base URL for the FairFlow FastAPI backend |
+| `VITE_USE_MOCK` | `false` | Set to `true` (or toggle **MODE: MOCK / LIVE API** in the top navbar) to run the UI without the backend running |
+
+### 3. Backend Endpoints Used by Screen
+
+- **Landing (`/`)**:
+  - `GET /api/v1/reports` (`TODO` thin adapter reading `results/` on-disk markdown & CSV/JSON artifacts for the Validation Plan section).
+- **Live Dashboard (`/dashboard`)**:
+  - `GET /api/v1/status` — Current enforcement state, interface/namespace, capacity estimate, active policy version, and last step outcome.
+  - `GET /api/v1/telemetry/history` & `GET /api/v1/telemetry/latest` — 1 Hz live charts for p95 latency, RFC 3550 jitter, packet loss, per-class throughput, queue depth, and Jain's fairness index.
+  - `GET /api/v1/contract` (`TODO` thin adapter) — Loads `contract.yaml` guardrails and minimum floors.
+  - `GET /api/v1/flows` & `POST /api/v1/flows/override` (`TODO` thin adapter around `TrafficClassifier` & `UserIntentRegistry`) — Displays metadata-classified flows with confidence scores and user-correctable class overrides.
+  - `GET /api/v1/policies`, `POST /api/v1/policies/validate`, `POST /api/v1/policies/propose` (`TODO` thin adapter) — Pre-Apply Gate validation, manual policy proposal, and policy safety timeline.
+  - `GET /api/v1/rollback/history` & `GET /api/v1/events` — SQLite audit log and verified rollback history from `results/audit.db`.
+  - `POST /api/v1/controller/enable`, `POST /api/v1/controller/disable`, `POST /api/v1/controller/evaluate`, `POST /api/v1/controller/capacity` — Controller pause/resume, manual step evaluation, and capacity simulation.
+- **Scenario Lab (`/lab`)**:
+  - `GET /api/v1/experiments`, `POST /api/v1/experiments`, `GET /api/v1/experiments/{id}/results` — Launch and monitor Scenarios S1 (`scenario_a`), S2 (`scenario_b`), S3 (`scenario_d`), and S4 (`scenario_c`).
+  - `GET /api/v1/reports` — Side-by-side baseline arm comparisons (`R0_no_qos`, `B1_static_htb`, `B2a_fq_codel`, `B2b_cake`) from `summary_by_arm.csv`.
+- **Report (`/report`)**:
+  - `GET /api/v1/reports` — Renders `report.md` and `trial_metrics.csv` written by `src/fairflow/report.py` with one-click Markdown download and **Export to PDF**.
+

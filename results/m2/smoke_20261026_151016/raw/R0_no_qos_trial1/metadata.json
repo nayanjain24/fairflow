@@ -1,0 +1,58 @@
+{
+  "tcp_congestion_control": "cubic",
+  "tcp_rmem": "4096\t131072\t6291456",
+  "tcp_wmem": "4096\t16384\t4194304",
+  "default_qdisc": "fq_codel",
+  "lscpu_raw": "Architecture:                            aarch64\nCPU op-mode(s):                          64-bit\nByte Order:                              Little Endian\nCPU(s):                                  6\nOn-line CPU(s) list:                     0-5\nVendor ID:                               Apple\nBIOS Vendor ID:                          QEMU\nModel name:                              -\nBIOS Model name:                         virt-8.2  CPU @ 2.0GHz\nBIOS CPU family:                         1\nModel:                                   0\nThread(s) per core:                      1\nCore(s) per socket:                      6\nSocket(s):                               1\nStepping:                                0x0\nBogoMIPS:                                48.00\nFlags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 asimdfhm dit uscat ilrcpc flagm sb paca pacg dcpodp flagm2 frint i8mm bf16 afp\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-5\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Vulnerable\nVulnerability Spectre v1:                Mitigation; __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; CSV2, but not BHB\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "offloads": {
+    "ff_client:ff_c_lan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    },
+    "ff_router:ff_r_lan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    },
+    "ff_router:ff_r_wan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    },
+    "ff_server:ff_s_wan": {
+      "tso": false,
+      "gso": false,
+      "gro": false
+    }
+  },
+  "contract_sha256": "04893b27e604b38cd0fb0e6267b307d2f05447fcde333fd73f1743b9d5a499a8",
+  "arm": "R0_no_qos",
+  "trial": 1,
+  "qdisc_before": [
+    {
+      "kind": "pfifo",
+      "handle": "8016:",
+      "root": true,
+      "refcnt": 7,
+      "options": {
+        "limit": 1000
+      }
+    }
+  ],
+  "class_before": "",
+  "qdisc_after": [
+    {
+      "kind": "pfifo",
+      "handle": "8016:",
+      "root": true,
+      "refcnt": 7,
+      "options": {
+        "limit": 1000
+      }
+    }
+  ],
+  "class_after": "",
+  "iperf_start_monotonic": 8676.00463207,
+  "iperf_end_monotonic": 8683.532495392
+}

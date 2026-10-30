@@ -1,0 +1,9 @@
+arm,trial,valid,invalid_reason,congested_added_delay_p99_ms,added_delay_p95_ms,bulk_goodput_mbps,bulk_goodput_fraction,call_loss_pct,interactive_target_met,bulk_floor_met,baseline_p50_ms,baseline_p99_ms,congested_p50_ms,congested_p95_ms,congested_p99_ms,congested_max_ms,congested_jitter_ms,sender_lateness_p99_ms
+B2a_fq_codel,1,True,,0.0,0.665,87.449,0.8745,0.0,True,True,15.047,21.673,15.333,15.804,15.893,35.601,2.799,0.004
+B2b_cake,1,True,,0.0,0.792,87.439,0.8744,0.0,True,True,15.035,21.717,15.329,15.879,17.212,17.938,0.377,0.004
+B1_static_htb,1,True,,5.247,1.098,90.816,0.9082,0.0,True,True,15.048,20.113,15.345,16.243,25.36,35.34,4.327,0.005
+R0_no_qos,1,True,,193.213,197.684,95.209,0.9521,0.0,False,True,15.035,21.713,155.994,212.806,214.926,217.172,10.206,0.009
+B1_static_htb,2,True,,16.827,11.352,90.597,0.906,0.0,True,True,15.038,18.137,15.414,26.465,34.965,41.012,3.503,0.001
+R0_no_qos,2,True,,195.984,195.002,95.211,0.9521,0.0,False,True,15.035,18.54,153.681,210.127,214.524,214.92,10.771,0.0
+B2a_fq_codel,2,True,,0.0,0.65,87.661,0.8766,0.0,True,True,15.035,21.663,15.286,15.794,15.871,15.897,0.378,0.0
+B2b_cake,2,True,,0.0,0.68,87.452,0.8745,0.0,True,True,15.033,21.074,15.288,15.806,15.871,15.908,0.452,0.006

@@ -9,16 +9,20 @@ FairFlow is a constraint-aware QoS controller for a home broadband link, emulate
 
 Hardware behaviour is emulated using Linux network namespaces, veth pairs, and tc (HTB/fq_codel).
 
-## Quickstart with Docker & GitHub Container Registry (GHCR)
+## Quickstart with Docker Hub (`nayan2406/fairflow`) & GHCR
 
-Every push to `main` automatically runs the test suite, builds the multi-stage Docker image ([`Dockerfile`](./Dockerfile)), and publishes it to **GitHub Container Registry (`ghcr.io/nayanjain24/fairflow:latest`)** via [`.github/workflows/docker-publish.yml`](./.github/workflows/docker-publish.yml).
+Every push to `main` automatically runs the test suite, builds the multi-stage Docker image ([`Dockerfile`](./Dockerfile)), and publishes it to **Docker Hub (`nayan2406/fairflow:latest`)** and **GitHub Container Registry (`ghcr.io/nayanjain24/fairflow:latest`)** via [`.github/workflows/docker-publish.yml`](./.github/workflows/docker-publish.yml).
 
 ```bash
-# Option 1: Pull and run directly from GitHub Container Registry
+# Option 1: Pull and run directly from Docker Hub (nayan2406)
+docker pull nayan2406/fairflow:latest
+docker run --rm --privileged -p 8000:8000 nayan2406/fairflow:latest
+
+# Option 2: Pull and run from GitHub Container Registry
 docker pull ghcr.io/nayanjain24/fairflow:latest
 docker run --rm --privileged -p 8000:8000 ghcr.io/nayanjain24/fairflow:latest
 
-# Option 2: Build and run locally with Docker Compose
+# Option 3: Build and run locally with Docker Compose
 docker compose up --build
 ```
 Then open **http://localhost:8000** for the FairFlow 3D Frontend (`/`, `/dashboard`, `/lab`, `/report`) and **http://localhost:8000/docs** for the FastAPI Swagger documentation.

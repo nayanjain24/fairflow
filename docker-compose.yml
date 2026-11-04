@@ -1,5 +1,6 @@
 services:
   fairflow:
+    image: nayan2406/fairflow:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,4 +17,3 @@ services:
     environment:
       - PYTHONPATH=/app
     restart: unless-stopped
-

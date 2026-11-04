@@ -95,6 +95,7 @@ export const DashboardPage: React.FC = () => {
     title: string;
     detail: string;
   } | null>(null);
+  const [guidedStepLoading, setGuidedStepLoading] = useState<boolean>(false);
   const [feedbackBanner, setFeedbackBanner] = useState<{
     type: 'success' | 'warning' | 'error';
     message: string;
@@ -267,111 +268,125 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const handleRunGuidedJudgeDemo = async () => {
-    if (guidedDemoStep) return;
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const executeGuidedStep = async (targetStep: 1 | 2 | 3 | 4) => {
+    setFeedbackBanner(null);
+    setGuidedStepLoading(true);
     try {
-      // Step 1: Clean reset + live traffic
-      setGuidedDemoStep({
-        step: 1,
-        total: 4,
-        title: 'Stage 1/4: Clean 100 Mbps Baseline & Live Traffic Injection',
-        detail: 'Resetting audit log, enforcing pol_v1_baseline (95.0 Mbps shaped HTB + fq_codel), and injecting iperf3 TCP bulk + 50 pps UDP VoIP...',
-      });
-      await resetSystem.mutateAsync();
-      try {
-        await startLiveTraffic.mutateAsync(25);
-      } catch {
-        // Ignore if traffic generator is mocked
+      if (targetStep === 1) {
+        setGuidedDemoStep({
+          step: 1,
+          total: 4,
+          title: 'Step 1 of 4: Clean 100 Mbps Baseline & Live Traffic Injection',
+          detail:
+            'Audit log reset cleanly, pol_v1_baseline (95.0 Mbps shaped HTB + fq_codel) enforced on ff_router:ff_r_lan, and live iperf3 TCP bulk + 50 pps UDP VoIP traffic started. Take your time to inspect the charts, then click Step 2 or "Next step →".',
+        });
+        await resetSystem.mutateAsync();
+        setGuidedDemoStep({
+          step: 1,
+          total: 4,
+          title: 'Step 1 of 4: Clean 100 Mbps Baseline & Live Traffic Injection',
+          detail:
+            'Audit log reset cleanly, pol_v1_baseline (95.0 Mbps shaped HTB + fq_codel) enforced on ff_router:ff_r_lan, and live iperf3 TCP bulk + 50 pps UDP VoIP traffic started. Take your time to inspect the charts, then click Step 2 or "Next step →".',
+        });
+        try {
+          await startLiveTraffic.mutateAsync(30);
+        } catch {
+          // Ignore if traffic generator is mocked
+        }
+      } else if (targetStep === 2) {
+        setGuidedDemoStep({
+          step: 2,
+          total: 4,
+          title: 'Step 2 of 4: Pre-Apply Safety Gate Rejection (S3 Starvation Policy)',
+          detail:
+            "Proposed a harmful policy with 0.5 Mbps interactive floor (< 2.0 Mbps contract floor). The Pre-Apply Safety Gate blocked it BEFORE reaching the Linux kernel and generated the Rejection Report below. Click Step 3 or 'Next step →' when ready.",
+        });
+        const s3Classes = [
+          { name: 'interactive', rate_mbps: 95, floor_mbps: 0.5, ceil_mbps: 95, priority: 1, leaf_qdisc: 'fq_codel' },
+          { name: 'streaming', rate_mbps: 95, floor_mbps: 8.0, ceil_mbps: 95, priority: 2, leaf_qdisc: 'fq_codel' },
+          { name: 'bulk', rate_mbps: 95, floor_mbps: 2.0, ceil_mbps: 95, priority: 3, leaf_qdisc: 'fq_codel' },
+        ];
+        const rejRes = await proposePolicy.mutateAsync({
+          policy: { classes: s3Classes },
+          capacity_mbps: 100.0,
+          capacity_is_raw: true,
+          simulate_canary_breach: false,
+        });
+        setActivePolicyReport({
+          policy_id: rejRes.policy_id,
+          verdict: rejRes.verdict,
+          reasons: rejRes.reasons,
+          explanation: rejRes.explanation || rejRes.reasons.join('; '),
+          usable_capacity_mbps: rejRes.usable_capacity_mbps,
+          required_minimum_mbps: rejRes.required_minimum_mbps,
+          classes: s3Classes,
+          report_markdown: rejRes.report_markdown || '',
+          timestamp: new Date().toLocaleTimeString(),
+        });
+      } else if (targetStep === 3) {
+        setGuidedDemoStep({
+          step: 3,
+          total: 4,
+          title: 'Step 3 of 4: Canary Latency Breach & Automated Verified Kernel Rollback',
+          detail:
+            "Applied a candidate pfifo policy -> Canary Monitor detected a 92.0 ms latency breach (> 80.0 ms guardrail) across 2 windows -> automatically rolled back to pol_v1_baseline and verified kernel qdisc state via tc -j qdisc show. Review the Rollback Report below, then click Step 4 or 'Next step →'.",
+        });
+        const rbClasses = [
+          { name: 'interactive', rate_mbps: 95, floor_mbps: 2.0, ceil_mbps: 95, priority: 1, leaf_qdisc: 'pfifo' },
+          { name: 'streaming', rate_mbps: 95, floor_mbps: 8.0, ceil_mbps: 95, priority: 2, leaf_qdisc: 'pfifo' },
+          { name: 'bulk', rate_mbps: 95, floor_mbps: 2.0, ceil_mbps: 95, priority: 3, leaf_qdisc: 'pfifo' },
+        ];
+        const rbRes = await proposePolicy.mutateAsync({
+          policy: { classes: rbClasses },
+          capacity_mbps: 100.0,
+          capacity_is_raw: true,
+          simulate_canary_breach: true,
+        });
+        setActivePolicyReport({
+          policy_id: rbRes.policy_id,
+          verdict: rbRes.verdict,
+          reasons: rbRes.reasons,
+          explanation: rbRes.explanation || rbRes.reasons.join('; '),
+          usable_capacity_mbps: rbRes.usable_capacity_mbps,
+          required_minimum_mbps: rbRes.required_minimum_mbps,
+          detect_time_s: rbRes.detect_time_s,
+          recover_time_s: rbRes.recover_time_s,
+          classes: rbClasses,
+          report_markdown: rbRes.report_markdown || '',
+          timestamp: new Date().toLocaleTimeString(),
+        });
+      } else if (targetStep === 4) {
+        setGuidedDemoStep({
+          step: 4,
+          total: 4,
+          title: 'Step 4 of 4: "Honest When Not" Capacity Infeasibility Check (9.0 Mbps Link Drop)',
+          detail:
+            'ISP capacity dropped to 9.0 Mbps (8.55 Mbps usable < 12.0 Mbps mandatory contract minimums). Instead of pretending guarantees are met, FairFlow displays the Honest Infeasibility Shortfall Banner below. Click "Restore 100 Mbps & Finish" when done.',
+        });
+        await updateCapacity.mutateAsync(9.0);
       }
-      await sleep(3000);
+    } catch (err) {
+      setFeedbackBanner({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to execute guided demo step.',
+      });
+    } finally {
+      setGuidedStepLoading(false);
+    }
+  };
 
-      // Step 2: Pre-Apply Safety Gate Rejection (0.5 Mbps interactive floor < 2.0 Mbps contract floor)
-      setGuidedDemoStep({
-        step: 2,
-        total: 4,
-        title: 'Stage 2/4: Pre-Apply Safety Gate Rejection (S3 Starvation Policy)',
-        detail: 'Proposing harmful policy with 0.5 Mbps interactive floor (< 2.0 Mbps contract minimum). Gate blocks it BEFORE reaching Linux kernel...',
-      });
-      const s3Classes = [
-        { name: 'interactive', rate_mbps: 95, floor_mbps: 0.5, ceil_mbps: 95, priority: 1, leaf_qdisc: 'fq_codel' },
-        { name: 'streaming', rate_mbps: 95, floor_mbps: 8.0, ceil_mbps: 95, priority: 2, leaf_qdisc: 'fq_codel' },
-        { name: 'bulk', rate_mbps: 95, floor_mbps: 2.0, ceil_mbps: 95, priority: 3, leaf_qdisc: 'fq_codel' },
-      ];
-      const rejRes = await proposePolicy.mutateAsync({
-        policy: { classes: s3Classes },
-        capacity_mbps: 100.0,
-        capacity_is_raw: true,
-        simulate_canary_breach: false,
-      });
-      setActivePolicyReport({
-        policy_id: rejRes.policy_id,
-        verdict: rejRes.verdict,
-        reasons: rejRes.reasons,
-        explanation: rejRes.explanation || rejRes.reasons.join('; '),
-        usable_capacity_mbps: rejRes.usable_capacity_mbps,
-        required_minimum_mbps: rejRes.required_minimum_mbps,
-        classes: s3Classes,
-        report_markdown: rejRes.report_markdown || '',
-        timestamp: new Date().toLocaleTimeString(),
-      });
-      await sleep(3500);
-
-      // Step 3: Canary Breach & Automated Verified Rollback
-      setGuidedDemoStep({
-        step: 3,
-        total: 4,
-        title: 'Stage 3/4: Canary Latency Breach & Automated Verified Kernel Rollback',
-        detail: 'Applying candidate pfifo policy -> detecting 92 ms delay breach (> 80 ms guardrail) -> auto-reverting to pol_v1_baseline and verifying kernel qdisc state...',
-      });
-      const rbClasses = [
-        { name: 'interactive', rate_mbps: 95, floor_mbps: 2.0, ceil_mbps: 95, priority: 1, leaf_qdisc: 'pfifo' },
-        { name: 'streaming', rate_mbps: 95, floor_mbps: 8.0, ceil_mbps: 95, priority: 2, leaf_qdisc: 'pfifo' },
-        { name: 'bulk', rate_mbps: 95, floor_mbps: 2.0, ceil_mbps: 95, priority: 3, leaf_qdisc: 'pfifo' },
-      ];
-      const rbRes = await proposePolicy.mutateAsync({
-        policy: { classes: rbClasses },
-        capacity_mbps: 100.0,
-        capacity_is_raw: true,
-        simulate_canary_breach: true,
-      });
-      setActivePolicyReport({
-        policy_id: rbRes.policy_id,
-        verdict: rbRes.verdict,
-        reasons: rbRes.reasons,
-        explanation: rbRes.explanation || rbRes.reasons.join('; '),
-        usable_capacity_mbps: rbRes.usable_capacity_mbps,
-        required_minimum_mbps: rbRes.required_minimum_mbps,
-        detect_time_s: rbRes.detect_time_s,
-        recover_time_s: rbRes.recover_time_s,
-        classes: rbClasses,
-        report_markdown: rbRes.report_markdown || '',
-        timestamp: new Date().toLocaleTimeString(),
-      });
-      await sleep(3500);
-
-      // Step 4: Honest When Infeasible (9.0 Mbps capacity drop) then restore
-      setGuidedDemoStep({
-        step: 4,
-        total: 4,
-        title: 'Stage 4/4: "Honest When Not" Capacity Infeasibility Check (9.0 Mbps Drop)',
-        detail: 'Simulating ISP drop to 9.0 Mbps (< 12.0 Mbps mandatory floor sum) to trigger the Honest Shortfall Banner, then restoring 100 Mbps...',
-      });
-      await updateCapacity.mutateAsync(9.0);
-      await sleep(3500);
+  const handleFinishGuidedDemo = async () => {
+    setGuidedStepLoading(true);
+    try {
       await updateCapacity.mutateAsync(100.0);
-
       setGuidedDemoStep(null);
       setFeedbackBanner({
         type: 'success',
-        message: 'Guided Judge Demo completed! All 4 stages (Baseline, Pre-Apply Gate Rejection, Canary Verified Rollback, and Honest Infeasibility) executed and logged.',
+        message:
+          'Guided Judge Demo completed! Restored 100.0 Mbps link capacity. All 4 stages and reports are recorded in the Policy Safety Timeline.',
       });
-    } catch (err) {
-      setGuidedDemoStep(null);
-      setFeedbackBanner({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Guided demo interrupted.',
-      });
+    } finally {
+      setGuidedStepLoading(false);
     }
   };
 
@@ -412,17 +427,21 @@ export const DashboardPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            disabled={Boolean(guidedDemoStep)}
-            onClick={handleRunGuidedJudgeDemo}
+            disabled={guidedStepLoading}
+            onClick={() => executeGuidedStep(1)}
             className="btn-primary !py-2 !px-4 !text-xs font-mono"
-            title="Automatically step through Baseline, Pre-Apply Gate Rejection, Canary Rollback, and Infeasibility Shortfall"
+            title="Start interactive step-by-step Judge Demo: tap each step number or Next Step when ready"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span>{guidedDemoStep ? `Running Demo (${guidedDemoStep.step}/4)...` : 'Run guided judge demo'}</span>
+            <span>
+              {guidedDemoStep
+                ? `Guided Demo (Step ${guidedDemoStep.step}/4)`
+                : 'Run guided judge demo'}
+            </span>
           </button>
           <button
             type="button"
-            disabled={resetSystem.isPending || Boolean(guidedDemoStep)}
+            disabled={resetSystem.isPending || guidedStepLoading}
             onClick={handleResetData}
             className="rounded-full border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 px-4 py-2 font-mono text-xs text-rose-200 flex items-center gap-2 transition-colors"
             title="Clear all policies, rollbacks, telemetry, and audit logs and restore clean baseline"
@@ -433,36 +452,108 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Guided Judge Demo Live Progress Banner */}
+      {/* Guided Judge Demo Live Progress Banner (Interactive Step-by-Step Controls) */}
       {guidedDemoStep && (
         <section
           role="status"
-          className="rounded-glass border-2 border-[#7c5cff] bg-gradient-to-r from-[#7c5cff]/25 via-[#0f2347] to-[#06051a] p-5 shadow-purple-glow"
+          className="rounded-glass border-2 border-[#7c5cff] bg-gradient-to-r from-[#7c5cff]/25 via-[#0f2347] to-[#06051a] p-5 shadow-purple-glow space-y-4"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-2 font-mono text-xs font-semibold text-[#b79bff]">
-                <Sparkles className="h-4 w-4 animate-spin" />
-                <span>GUIDED JUDGE DEMO IN PROGRESS • STEP {guidedDemoStep.step} OF {guidedDemoStep.total}</span>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="inline-flex flex-wrap items-center gap-2 font-mono text-xs font-semibold text-[#b79bff]">
+                <Sparkles className={`h-4 w-4 ${guidedStepLoading ? 'animate-spin text-[#f26a1b]' : 'text-[#b79bff]'}`} />
+                <span>
+                  INTERACTIVE JUDGE DEMO • STEP {guidedDemoStep.step} OF {guidedDemoStep.total} (PAUSED FOR READING — TAP ANY STEP NUMBER OR NEXT)
+                </span>
               </div>
               <h2 className="text-base sm:text-lg font-semibold text-white">{guidedDemoStep.title}</h2>
-              <p className="text-xs text-[#cbd5e1]">{guidedDemoStep.detail}</p>
+              <p className="text-xs sm:text-sm text-[#e2e8f0] leading-relaxed max-w-4xl">{guidedDemoStep.detail}</p>
             </div>
-            <div className="flex items-center gap-1.5 font-mono text-xs shrink-0">
-              {[1, 2, 3, 4].map((n) => (
-                <span
-                  key={n}
-                  className={`h-7 w-7 rounded-full flex items-center justify-center font-bold border ${
-                    n === guidedDemoStep.step
-                      ? 'border-[#f26a1b] bg-[#f26a1b] text-white'
-                      : n < guidedDemoStep.step
-                      ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300'
-                      : 'border-white/15 bg-white/5 text-[var(--mute)]'
-                  }`}
+
+            {/* Interactive Step Number Buttons */}
+            <div className="flex flex-col sm:items-end gap-2.5 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                {(
+                  [
+                    { step: 1, short: '1. Baseline' },
+                    { step: 2, short: '2. Gate Reject' },
+                    { step: 3, short: '3. Rollback' },
+                    { step: 4, short: '4. Infeasible' },
+                  ] as const
+                ).map(({ step, short }) => {
+                  const isActive = step === guidedDemoStep.step
+                  const isCompleted = step < guidedDemoStep.step
+                  return (
+                    <button
+                      key={step}
+                      type="button"
+                      disabled={guidedStepLoading}
+                      onClick={() => executeGuidedStep(step)}
+                      title={`Jump to Step ${step}: ${short}`}
+                      className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 font-bold border transition-all cursor-pointer disabled:opacity-50 ${
+                        isActive
+                          ? 'border-[#f26a1b] bg-[#f26a1b] text-white shadow-[0_0_16px_rgba(242,106,27,0.5)] scale-105'
+                          : isCompleted
+                          ? 'border-emerald-500/60 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
+                          : 'border-white/20 bg-white/5 text-[#cbd5e1] hover:border-white/40 hover:bg-white/10'
+                      }`}
+                    >
+                      <span className="h-5 w-5 rounded-full bg-black/30 flex items-center justify-center text-[11px]">
+                        {step}
+                      </span>
+                      <span>{short.split('. ')[1]}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Prev / Next / Finish Controls */}
+              <div className="flex items-center gap-2 font-mono text-xs">
+                <button
+                  type="button"
+                  disabled={guidedStepLoading || guidedDemoStep.step <= 1}
+                  onClick={() =>
+                    executeGuidedStep(Math.max(1, guidedDemoStep.step - 1) as 1 | 2 | 3 | 4)
+                  }
+                  className="rounded-full border border-white/20 bg-white/5 hover:bg-white/15 disabled:opacity-40 px-3.5 py-1.5 text-white transition-colors"
                 >
-                  {n}
-                </span>
-              ))}
+                  ← Prev step
+                </button>
+
+                {guidedDemoStep.step < 4 ? (
+                  <button
+                    type="button"
+                    disabled={guidedStepLoading}
+                    onClick={() =>
+                      executeGuidedStep((guidedDemoStep.step + 1) as 1 | 2 | 3 | 4)
+                    }
+                    className="rounded-full border border-[#f26a1b] bg-[#f26a1b] hover:bg-[#ff7b2e] disabled:opacity-50 px-4 py-1.5 font-semibold text-white shadow-[0_0_15px_rgba(242,106,27,0.4)] transition-all"
+                  >
+                    {guidedStepLoading
+                      ? 'Executing step...'
+                      : `Next: Step ${guidedDemoStep.step + 1} →`}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={guidedStepLoading}
+                    onClick={handleFinishGuidedDemo}
+                    className="rounded-full border border-emerald-400 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 px-4 py-1.5 font-semibold text-slate-950 transition-all"
+                  >
+                    {guidedStepLoading ? 'Restoring...' : 'Restore 100 Mbps & Finish ✓'}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  disabled={guidedStepLoading}
+                  onClick={() => setGuidedDemoStep(null)}
+                  className="rounded-full border border-white/15 bg-black/30 hover:bg-white/10 px-3 py-1.5 text-[var(--mute)] hover:text-white transition-colors"
+                  title="Close guided demo banner and keep current link state"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </section>

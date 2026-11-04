@@ -26,9 +26,9 @@ import uuid
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
 
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, status
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -1867,6 +1867,15 @@ def create_app(
         bg_thread = threading.Thread(target=_background_control_loop, daemon=True, name="fairflow-control-loop")
         bg_thread.start()
 
+    # Add HTTP Security Headers middleware
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next: Any) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
     # Serve compiled React production bundle (dist/) when available (e.g. inside Docker)
     dist_dir = Path(__file__).resolve().parent.parent.parent / "dist"
     if (dist_dir / "index.html").exists():
@@ -1875,7 +1884,16 @@ def create_app(
             app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
         @app.get("/{full_path:path}", include_in_schema=False)
-        def serve_spa(full_path: str) -> FileResponse:
+        def serve_spa(full_path: str, request: Request) -> Response:
+            # If the user navigates in a browser to the non-localhost VM IP (192.168.252.2:8000),
+            # Chrome flags non-localhost HTTP IPs as "Not Secure". Redirect HTML navigations to
+            # http://localhost:5173 (a W3C Secure Context in Chrome) so the warning disappears.
+            host_hdr = request.headers.get("host", "")
+            accept_hdr = request.headers.get("accept", "")
+            if host_hdr.startswith("192.168.252.2") and "text/html" in accept_hdr:
+                target_path = f"/{full_path}" if full_path else "/"
+                return RedirectResponse(url=f"http://localhost:5173{target_path}", status_code=307)
+
             candidate_file = (dist_dir / full_path).resolve()
             if full_path and candidate_file.is_file() and str(candidate_file).startswith(str(dist_dir.resolve())):
                 return FileResponse(str(candidate_file))

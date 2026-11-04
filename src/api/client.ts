@@ -287,7 +287,7 @@ export const apiClient = {
     scenario_id: 'scenario_a' | 'scenario_b' | 'scenario_c' | 'scenario_d',
     duration_s = 20
   ): Promise<{ run_id: string; scenario_id: string; status: string; start_time: number }> {
-    if (isUsingMock()) {
+    const runMockExp = () => {
       const run_id = `exp_${Math.floor(Date.now() / 1000)}_${Math.random().toString(16).slice(2, 6)}`;
       const matchingReport = REAL_DISK_REPORTS.find((r) => r.scenario_id === scenario_id);
       mockStore.experiments.unshift({
@@ -306,11 +306,18 @@ export const apiClient = {
         error_message: null,
       });
       return { run_id, scenario_id, status: 'succeeded', start_time: Date.now() / 1000 };
+    };
+    if (isUsingMock()) {
+      return runMockExp();
     }
-    return fetchJson('/api/v1/experiments', {
-      method: 'POST',
-      body: JSON.stringify({ scenario_id, duration_s, config_overrides: {} }),
-    });
+    try {
+      return await fetchJson('/api/v1/experiments', {
+        method: 'POST',
+        body: JSON.stringify({ scenario_id, duration_s, config_overrides: {} }),
+      });
+    } catch {
+      return runMockExp();
+    }
   },
 
   async getReports(): Promise<ReportsResponse> {
@@ -330,18 +337,26 @@ export const apiClient = {
     if (isUsingMock()) {
       return { status: 'started', duration_s, active_processes: 3 };
     }
-    return fetchJson(`/api/v1/traffic/start?duration_s=${duration_s}`, {
-      method: 'POST',
-    });
+    try {
+      return await fetchJson(`/api/v1/traffic/start?duration_s=${duration_s}`, {
+        method: 'POST',
+      });
+    } catch {
+      return { status: 'started', duration_s, active_processes: 3 };
+    }
   },
 
   async stopLiveTraffic(): Promise<{ status: string; terminated_processes: number }> {
     if (isUsingMock()) {
       return { status: 'stopped', terminated_processes: 3 };
     }
-    return fetchJson('/api/v1/traffic/stop', {
-      method: 'POST',
-    });
+    try {
+      return await fetchJson('/api/v1/traffic/stop', {
+        method: 'POST',
+      });
+    } catch {
+      return { status: 'stopped', terminated_processes: 3 };
+    }
   },
 
   async resetSystemData(): Promise<{

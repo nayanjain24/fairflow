@@ -57,7 +57,7 @@ jobs:
           PYTHONPATH=. pytest -q tests/test_api.py tests/test_feasibility.py tests/test_classifier.py tests/test_dynamic_controller.py tests/test_store.py
 
   build-and-push-docker:
-    name: Build & Push Docker Image (GHCR & Docker Hub)
+    name: Build & Push Docker Image (GHCR)
     needs: verify-and-test
     runs-on: ubuntu-latest
     steps:
@@ -75,20 +75,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to Docker Hub (optional if secrets configured)
-        if: github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Extract Docker metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-            ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/fairflow', secrets.DOCKERHUB_USERNAME) || '' }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch

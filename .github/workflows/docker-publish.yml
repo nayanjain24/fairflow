@@ -59,7 +59,7 @@ jobs:
           PYTHONPATH=. pytest -q tests/test_api.py tests/test_feasibility.py tests/test_classifier.py tests/test_dynamic_controller.py tests/test_store.py
 
   build-and-push-docker:
-    name: Build & Push Docker Image (nayan2406/fairflow & GHCR)
+    name: Build & Push Multi-Arch Docker Image (nayan2406/fairflow & GHCR)
     needs: verify-and-test
     runs-on: ubuntu-latest
     env:
@@ -67,6 +67,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up QEMU for multi-architecture builds (amd64 + arm64)
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -99,11 +102,12 @@ jobs:
             type=ref,event=tag
             type=sha,prefix=sha-
 
-      - name: Build and push FairFlow Docker image
+      - name: Build and push multi-arch FairFlow Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

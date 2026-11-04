@@ -265,3 +265,43 @@ export interface ReportsResponse {
   reports: DiskReportEntry[];
 }
 
+export interface KernelQdiscEntry {
+  kind: string;
+  handle: string;
+  parent?: string;
+  root?: boolean;
+  bytes?: number;
+  packets?: number;
+  drops?: number;
+  overlimits?: number;
+  requeues?: number;
+  backlog?: number;
+  qlen?: number;
+  options?: Record<string, unknown>;
+}
+
+export interface KernelClassEntry {
+  class: string;
+  handle: string;
+  parent?: string;
+  root?: boolean;
+  rate?: number;
+  ceil?: number;
+  bytes?: number;
+  packets?: number;
+  drops?: number;
+  overlimits?: number;
+  tokens?: number;
+  ctokens?: number;
+}
+
+export interface KernelQdiscResponse {
+  namespace: string;
+  interface: string;
+  linux_kernel_active: boolean;
+  qdiscs: KernelQdiscEntry[];
+  classes: KernelClassEntry[];
+  timestamp: number;
+}
+
+

@@ -12,4 +12,28 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 950,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three') || id.includes('@react-three')) {
+              return 'three-vendor';
+            }
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'charts-vendor';
+            }
+            if (id.includes('gsap') || id.includes('framer-motion') || id.includes('lenis')) {
+              return 'motion-vendor';
+            }
+            if (id.includes('react') || id.includes('@tanstack')) {
+              return 'react-vendor';
+            }
+          }
+          return undefined;
+        },
+      },
+    },
+  },
 });

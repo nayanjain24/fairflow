@@ -1,6 +1,59 @@
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { apiClient, isUsingMock } from '../api/client';
 import { PolicyProposeRequest, PolicyValidateRequest } from '../api/types';
+
+export function useLiveSSEStream() {
+  const qc = useQueryClient();
+  const [sseConnected, setSseConnected] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isUsingMock() || typeof window === 'undefined' || typeof EventSource === 'undefined') {
+      setSseConnected(false);
+      return;
+    }
+
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(apiClient.getStreamUrl());
+      es.onopen = () => {
+        setSseConnected(true);
+      };
+      es.onmessage = (ev) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          if (payload.status) {
+            qc.setQueryData(['fairflow', 'status'], payload.status);
+          }
+          if (Array.isArray(payload.flows)) {
+            qc.setQueryData(['fairflow', 'flows'], payload.flows);
+          }
+        } catch {
+          // Ignore malformed SSE frame
+        }
+      };
+      es.onerror = () => {
+        setSseConnected(false);
+      };
+    } catch {
+      setSseConnected(false);
+    }
+
+    return () => {
+      if (es) es.close();
+    };
+  }, [qc]);
+
+  return { sseConnected };
+}
+
+export function useKernelQdisc(pollIntervalMs = 2000) {
+  return useQuery({
+    queryKey: ['fairflow', 'kernel_qdisc'],
+    queryFn: () => apiClient.getKernelQdisc(),
+    refetchInterval: pollIntervalMs,
+  });
+}
 
 export function useLiveStatus(pollIntervalMs = 1000) {
   return useQuery({

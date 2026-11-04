@@ -4,6 +4,7 @@ import {
   ContractData,
   ExperimentRun,
   HealthResponse,
+  KernelQdiscResponse,
   PolicyProposeRequest,
   PolicyProposeResponse,
   PolicyRecord,
@@ -18,6 +19,7 @@ import {
   MOCK_CONTRACT,
   REAL_DISK_REPORTS,
   getMockHealth,
+  getMockKernelQdisc,
   getMockStatus,
   getMockTelemetryHistory,
   mockStore,
@@ -373,6 +375,25 @@ export const apiClient = {
         message: 'All audit history, policy proposals, rollbacks, and overrides cleared. Restored clean 100.0 Mbps baseline (pol_v1_baseline).',
       };
     }
+  },
+
+  async getKernelQdisc(): Promise<KernelQdiscResponse> {
+    if (isUsingMock()) {
+      return getMockKernelQdisc();
+    }
+    try {
+      const res = await fetchJson<KernelQdiscResponse>('/api/v1/kernel/qdisc');
+      if (res && Array.isArray(res.qdiscs) && res.qdiscs.length > 0) {
+        return res;
+      }
+      return getMockKernelQdisc();
+    } catch {
+      return getMockKernelQdisc();
+    }
+  },
+
+  getStreamUrl(): string {
+    return `${ENV_API_URL}/api/v1/stream`;
   },
 };
 

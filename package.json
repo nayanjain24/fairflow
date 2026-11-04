@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "start": "bash ./start.sh",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"

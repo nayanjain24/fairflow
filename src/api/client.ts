@@ -31,27 +31,51 @@ import {
 const ENV_API_URL = import.meta.env.VITE_API_URL || '';
 const ENV_USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
+const isStaticCloudHost =
+  typeof window !== 'undefined' &&
+  !ENV_API_URL &&
+  (window.location.hostname.endsWith('.vercel.app') ||
+    window.location.hostname.endsWith('.github.io') ||
+    window.location.hostname.endsWith('.netlify.app') ||
+    window.location.hostname.endsWith('.pages.dev'));
+
 let runtimeMockOverride: boolean | null = null;
+let autoFallbackToMock = false;
 
 export function isUsingMock(): boolean {
   if (runtimeMockOverride !== null) return runtimeMockOverride;
-  return ENV_USE_MOCK;
+  if (ENV_USE_MOCK || isStaticCloudHost || autoFallbackToMock) return true;
+  return false;
 }
 
 export function setRuntimeMockMode(useMock: boolean): void {
   runtimeMockOverride = useMock;
+  if (!useMock) {
+    autoFallbackToMock = false;
+  }
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const url = ENV_API_URL ? `${ENV_API_URL.replace(/\/$/, '')}${path}` : path;
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  });
-  if (!response.ok) {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers || {}),
+      },
+    });
+  } catch (err) {
+    autoFallbackToMock = true;
+    throw err;
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!response.ok || contentType.includes('text/html')) {
+    if (response.status === 404 || response.status === 502 || contentType.includes('text/html')) {
+      autoFallbackToMock = true;
+    }
     let detail = response.statusText;
     try {
       const errBody = await response.json();
@@ -60,7 +84,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
       // ignore json parse failure
     }
     throw new Error(
-      `API request to ${path} failed (${response.status}): ${detail}. Ensure the FairFlow FastAPI backend is running or switch to Mock Mode.`
+      `API request to ${path} failed (${response.status}): ${detail}.`
     );
   }
   return response.json() as Promise<T>;

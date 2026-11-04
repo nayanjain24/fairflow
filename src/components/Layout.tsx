@@ -109,14 +109,14 @@ export const Navbar: React.FC = () => {
           <button
             type="button"
             onClick={toggleMock}
-            title="Switch between live FastAPI backend and deterministic mock mode"
+            title="Switch between live FastAPI backend and deterministic interactive engine"
             className={`rounded-full px-3 py-1 text-xs font-mono border transition-colors ${
               mockMode
-                ? 'border-[#f26a1b]/50 bg-[#f26a1b]/10 text-[#f26a1b]'
+                ? 'border-[#7c5cff]/50 bg-[#7c5cff]/15 text-[#b79bff]'
                 : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
             }`}
           >
-            {mockMode ? 'MODE: MOCK' : 'MODE: LIVE API'}
+            {mockMode ? 'MODE: CLOUD ENGINE' : 'MODE: LIVE API'}
           </button>
           <Link to="/dashboard" className="btn-primary !py-2 !px-4 !text-xs sm:!text-sm">
             Open dashboard

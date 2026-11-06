@@ -1211,6 +1211,62 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* 3-Namespace Linux Testbed Architecture Diagram */}
+        <div className="rounded-2xl border border-white/10 bg-[#080620]/90 p-4 font-mono text-xs">
+          <div className="flex items-center justify-between text-[11px] text-[var(--mute)] mb-3">
+            <span>ISOLATED LINUX NETWORK NAMESPACE TOPOLOGY (ip netns)</span>
+            <span className="text-emerald-300">
+              Shaped Bottleneck: {usableCapacity.toFixed(1)} Mbps (95% of {rawCapacity.toFixed(0)} Mbps)
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+            {/* Namespace 1: ff_server (WAN) */}
+            <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sky-300 font-bold">netns: ff_server</span>
+                <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] text-sky-200">WAN SENDERS</span>
+              </div>
+              <div className="text-[11px] text-[#cbd5e1]">veth: ff_s_veth (10.10.2.2/24)</div>
+              <div className="text-[10px] text-[var(--mute)]">
+                iperf3 TCP Bulk + 4K Video + 50 pps VoIP UDP Probes
+              </div>
+            </div>
+
+            {/* Namespace 2: ff_router (HTB + fq_codel + ifb0) */}
+            <div className="rounded-xl border-2 border-[#7c5cff]/60 bg-[#7c5cff]/10 p-3 space-y-1.5 shadow-purple-glow">
+              <div className="flex items-center justify-between">
+                <span className="text-[#b79bff] font-bold">netns: ff_router</span>
+                <span className="rounded bg-[#f26a1b]/25 border border-[#f26a1b]/50 px-1.5 py-0.5 text-[10px] text-[#f26a1b]">
+                  SAFETY GATE + HTB
+                </span>
+              </div>
+              <div className="text-[11px] text-white">
+                ff_r_wan (ifb0 ingress) ↔{' '}
+                <strong className="text-emerald-300">ff_r_lan (HTB 1:1 @ {usableCapacity.toFixed(1)}M)</strong>
+              </div>
+              <div className="flex flex-wrap gap-1 pt-0.5 text-[10px]">
+                <span className="rounded bg-[#ff8fb8]/20 text-[#ff8fb8] px-1.5 py-0.5">1:10 Interactive</span>
+                <span className="rounded bg-[#7c5cff]/30 text-[#b79bff] px-1.5 py-0.5">1:20 Streaming</span>
+                <span className="rounded bg-sky-500/20 text-sky-300 px-1.5 py-0.5">1:30 Bulk</span>
+              </div>
+            </div>
+
+            {/* Namespace 3: ff_client (LAN) */}
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-300 font-bold">netns: ff_client</span>
+                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-200">
+                  PROTECTED LAN
+                </span>
+              </div>
+              <div className="text-[11px] text-[#cbd5e1]">veth: ff_c_veth (10.10.1.2/24)</div>
+              <div className="text-[10px] text-[var(--mute)]">
+                Zero-Jitter Call/Game Receivers • Telemetry Collector
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* HTB Class & Leaf Qdisc Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
           {(kernelQdisc?.classes || []).map((cls) => {

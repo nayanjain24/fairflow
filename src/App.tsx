@@ -6,6 +6,7 @@ import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LabPage } from './pages/LabPage';
 import { ReportPage } from './pages/ReportPage';
+import { SlidesPage } from './pages/SlidesPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,7 @@ export function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/lab" element={<LabPage />} />
               <Route path="/report" element={<ReportPage />} />
+              <Route path="/slides" element={<SlidesPage />} />
             </Routes>
           </div>
           <Footer />

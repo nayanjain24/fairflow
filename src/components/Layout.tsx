@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, FlaskConical, FileText, Menu, ShieldCheck, X } from 'lucide-react';
+import { Activity, FlaskConical, FileText, Menu, Presentation, ShieldCheck, X } from 'lucide-react';
 import { isUsingMock, setRuntimeMockMode } from '../api/client';
 
 export const Navbar: React.FC = () => {
@@ -102,6 +102,15 @@ export const Navbar: React.FC = () => {
             <FileText className="w-3.5 h-3.5" />
             Report
           </Link>
+          <Link
+            to="/slides"
+            className={`hover:text-[var(--text)] transition-colors flex items-center gap-1.5 ${
+              location.pathname === '/slides' ? 'text-[#f26a1b] font-medium' : 'text-[#b79bff]'
+            }`}
+          >
+            <Presentation className="w-3.5 h-3.5" />
+            10-Slide PPT
+          </Link>
         </div>
 
         {/* Right Actions */}
@@ -186,6 +195,13 @@ export const Navbar: React.FC = () => {
               className="py-1.5 text-[var(--text)] font-medium"
             >
               Evaluation report (/report)
+            </Link>
+            <Link
+              to="/slides"
+              onClick={() => setMobileOpen(false)}
+              className="py-1.5 text-[#b79bff] font-medium"
+            >
+              10-Slide PPT Deck (/slides)
             </Link>
           </div>
           <div className="pt-2 flex items-center justify-between gap-2">

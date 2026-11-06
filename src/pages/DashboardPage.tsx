@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity,
@@ -400,6 +400,33 @@ export const DashboardPage: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Keyboard shortcuts (← / → / 1-4 / Esc) while Guided Judge Demo is active
+  useEffect(() => {
+    if (!guidedDemoStep || guidedStepLoading) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (guidedDemoStep.step < 4) {
+          executeGuidedStep((guidedDemoStep.step + 1) as 1 | 2 | 3 | 4);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (guidedDemoStep.step > 1) {
+          executeGuidedStep((guidedDemoStep.step - 1) as 1 | 2 | 3 | 4);
+        }
+      } else if (['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
+        executeGuidedStep(Number(e.key) as 1 | 2 | 3 | 4);
+      } else if (e.key === 'Escape') {
+        setGuidedDemoStep(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [guidedDemoStep, guidedStepLoading]);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">

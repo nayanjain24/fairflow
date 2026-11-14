@@ -21,11 +21,17 @@ Safety Invariants:
 from __future__ import annotations
 
 import math
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Any, Optional, Sequence, Tuple, List, Callable, Protocol
+
+try:
+    import resource as _resource
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    _resource = None
 
 from src.fairflow.policy import Policy
 from src.fairflow.contract import Contract
@@ -183,6 +189,25 @@ class AdaptiveCapacityEstimator:
         self.wall_time_fn = wall_time_fn or time.time
         self._consecutive_good_windows: int = 0
         self._manual_override: bool = False
+        self._ground_truth_errors_mbps: List[float] = []
+        self._last_ground_truth_mbps: Optional[float] = None
+
+    def record_ground_truth(self, true_capacity_mbps: float) -> float:
+        """Record a known ground-truth capacity sample to track estimator absolute error."""
+        true_val = max(0.1, float(true_capacity_mbps))
+        self._last_ground_truth_mbps = true_val
+        err = abs(self.capacity_mbps - true_val)
+        self._ground_truth_errors_mbps.append(err)
+        if len(self._ground_truth_errors_mbps) > 100:
+            self._ground_truth_errors_mbps.pop(0)
+        return round(err, 3)
+
+    @property
+    def mean_abs_error_mbps(self) -> Optional[float]:
+        """Return empirical MAE against recorded ground truth, or None if unavailable."""
+        if not self._ground_truth_errors_mbps:
+            return None
+        return round(sum(self._ground_truth_errors_mbps) / len(self._ground_truth_errors_mbps), 3)
 
     def set_capacity(self, capacity_mbps: float, is_available: bool = True) -> None:
         """Explicitly set capacity estimate (e.g. from test harness or manual capacity drop test)."""
@@ -245,6 +270,7 @@ class AdaptiveCapacityEstimator:
                 )
                 self.capacity_mbps = round(step_up, 2)
                 self.confidence = min(0.98, round(self.confidence + 0.03, 2))
+                self.uncertainty_mbps = max(1.0, round(self.uncertainty_mbps * 0.85, 2))
                 self.reason = (
                     f"Recovered after {self._consecutive_good_windows} clean windows; "
                     f"probing capacity to {self.capacity_mbps:.1f} Mbps"
@@ -331,6 +357,84 @@ class DynamicController:
         self._outcomes: List[ControlStepOutcome] = []
         self._canary_measurements: List[CanaryMeasurement] = []
 
+        # Controller computational overhead and safety decision counters
+        self._overhead_lock = threading.Lock()
+        self._steps_evaluated: int = 0
+        self._total_wall_ms: float = 0.0
+        self._total_cpu_ms: float = 0.0
+        self._last_step_wall_ms: float = 0.0
+        self._last_step_cpu_ms: float = 0.0
+        self._max_step_wall_ms: float = 0.0
+        self._gate_rejections: int = 0
+        self._deadband_suppressions: int = 0
+        self._canary_rollbacks: int = 0
+        self._commits: int = 0
+
+    def _record_overhead(self, outcome_tag: str, wall_ms: float, cpu_ms: float) -> None:
+        """Update per-step execution timing and decision counters safely."""
+        w_ms = max(0.0, float(wall_ms))
+        c_ms = max(0.0, float(cpu_ms))
+        tag = str(outcome_tag).upper()
+        with self._overhead_lock:
+            self._steps_evaluated += 1
+            self._total_wall_ms += w_ms
+            self._total_cpu_ms += c_ms
+            self._last_step_wall_ms = w_ms
+            self._last_step_cpu_ms = c_ms
+            self._max_step_wall_ms = max(self._max_step_wall_ms, w_ms)
+            if "REJECTED" in tag:
+                self._gate_rejections += 1
+            elif "DEADBAND" in tag:
+                self._deadband_suppressions += 1
+            elif "ROLLED_BACK" in tag or "ROLLBACK" in tag:
+                self._canary_rollbacks += 1
+            elif "COMMITTED" in tag or "ACCEPTED" in tag:
+                self._commits += 1
+
+    def record_external_decision(self, verdict: str, wall_ms: float = 0.0, cpu_ms: float = 0.0) -> None:
+        """Record overhead and verdict counts for policies proposed through REST endpoints."""
+        self._record_overhead(verdict, wall_ms, cpu_ms)
+
+    @staticmethod
+    def _read_process_rss_mb() -> float:
+        """Read current resident memory footprint in MiB using OS-appropriate units."""
+        if _resource is None:
+            return 0.0
+        rss_raw = _resource.getrusage(_resource.RUSAGE_SELF).ru_maxrss
+        # macOS reports ru_maxrss in bytes; Linux reports kilobytes.
+        divisor = (1024.0 * 1024.0) if sys.platform == "darwin" else 1024.0
+        return round(rss_raw / divisor, 2)
+
+    def get_overhead_metrics(self) -> Dict[str, Any]:
+        """Return controller execution latency, CPU, RSS memory, and estimator accuracy telemetry."""
+        cap_est = self.capacity_provider.get_capacity_estimate(self.clock())
+        est_mae = getattr(self.capacity_provider, "mean_abs_error_mbps", None)
+        with self._overhead_lock:
+            steps = self._steps_evaluated
+            avg_wall = round(self._total_wall_ms / steps, 4) if steps > 0 else 0.0
+            avg_cpu = round(self._total_cpu_ms / steps, 4) if steps > 0 else 0.0
+            return {
+                "steps_evaluated": steps,
+                "last_step_wall_ms": round(self._last_step_wall_ms, 4),
+                "avg_step_wall_ms": avg_wall,
+                "max_step_wall_ms": round(self._max_step_wall_ms, 4),
+                "last_step_cpu_ms": round(self._last_step_cpu_ms, 4),
+                "avg_step_cpu_ms": avg_cpu,
+                "process_rss_mb": self._read_process_rss_mb(),
+                "gate_rejections": self._gate_rejections,
+                "deadband_suppressions": self._deadband_suppressions,
+                "canary_rollbacks": self._canary_rollbacks,
+                "commits": self._commits,
+                "estimator": {
+                    "capacity_mbps": cap_est.capacity_mbps if cap_est.is_available else None,
+                    "source": cap_est.source,
+                    "confidence": round(float(cap_est.confidence), 3),
+                    "uncertainty_mbps": round(float(cap_est.uncertainty_mbps), 3),
+                    "mae_mbps": est_mae,
+                    "reason": cap_est.reason,
+                },
+            }
+
     @property
     def interface(self) -> str:
         return self.coordinator.interface
@@ -400,213 +504,227 @@ class DynamicController:
                 f"Concurrent mutation collision on interface '{self.interface}' in namespace '{self.namespace}'"
             )
 
+        t_wall_start = time.perf_counter()
+        t_cpu_start = time.process_time()
+        try:
+            outcome = self._process_observation_window_unlocked(telemetry, active_intents=active_intents)
+            wall_ms = (time.perf_counter() - t_wall_start) * 1000.0
+            cpu_ms = (time.process_time() - t_cpu_start) * 1000.0
+            action_tag = outcome.action.value if hasattr(outcome.action, "value") else str(outcome.action)
+            self._record_overhead(action_tag, wall_ms, cpu_ms)
+            return outcome
+        finally:
+            self._mutex.release()
+
+    def _process_observation_window_unlocked(
+        self,
+        telemetry: TelemetryWindow,
+        active_intents: Optional[Sequence[UserIntent]] = None,
+    ) -> ControlStepOutcome:
+        """Internal step execution called with self._mutex already held."""
         now_mono = self.clock()
         now_wall = self.wall_clock()
         self._step_counter += 1
         step_idx = self._step_counter
 
-        try:
-            # 1. Telemetry validation and freshness check
-            if telemetry.end_time_monotonic < self._last_window_end_time:
-                err = (
-                    f"Out-of-order telemetry: window end ({telemetry.end_time_monotonic}) "
-                    f"< previous window end ({self._last_window_end_time})"
-                )
-                outcome = ControlStepOutcome(
-                    step_index=step_idx,
-                    action=ControlAction.FAILED,
-                    timestamp_monotonic=now_mono,
-                    wall_clock_time=now_wall,
-                    decision_id=None,
-                    capacity_estimate=None,
-                    classified_flow_count=0,
-                    policy_proposed=None,
-                    enforcement_outcome=None,
-                    canary_result=None,
-                    explanation=f"Telemetry rejected: {err}",
-                )
-                self._outcomes.append(outcome)
-                return outcome
-
-            self._last_window_end_time = telemetry.end_time_monotonic
-
-            # 2. Flow classification
-            classified_flows: List[Tuple[FlowMetadata, ClassificationResult]] = []
-            for flow in telemetry.flows:
-                res = self.classifier.classify(flow, current_time=now_mono)
-                classified_flows.append((flow, res))
-
-            # 3. Capacity estimation
-            cap_estimate = self.capacity_provider.get_capacity_estimate(now_mono)
-            if not cap_estimate.is_available:
-                outcome = ControlStepOutcome(
-                    step_index=step_idx,
-                    action=ControlAction.NOOP_CAPACITY_UNAVAILABLE,
-                    timestamp_monotonic=now_mono,
-                    wall_clock_time=now_wall,
-                    decision_id=None,
-                    capacity_estimate=cap_estimate,
-                    classified_flow_count=len(classified_flows),
-                    policy_proposed=None,
-                    enforcement_outcome=None,
-                    canary_result=None,
-                    explanation="Capacity estimate unavailable; holding existing operational policy",
-                )
-                self._outcomes.append(outcome)
-                return outcome
-
-            # 4. Propose candidate policy
-            decision_record = self.engine.generate_candidate_policy(
-                classified_flows=classified_flows,
-                estimated_capacity_mbps=cap_estimate.capacity_mbps,
-                timestamp=now_mono,
+        # 1. Telemetry validation and freshness check
+        if telemetry.end_time_monotonic < self._last_window_end_time:
+            err = (
+                f"Out-of-order telemetry: window end ({telemetry.end_time_monotonic}) "
+                f"< previous window end ({self._last_window_end_time})"
             )
-
-            if decision_record.state != PolicyState.VALIDATED or not decision_record.proposed_policy:
-                outcome = ControlStepOutcome(
-                    step_index=step_idx,
-                    action=ControlAction.REJECTED,
-                    timestamp_monotonic=now_mono,
-                    wall_clock_time=now_wall,
-                    decision_id=decision_record.decision_id,
-                    capacity_estimate=cap_estimate,
-                    classified_flow_count=len(classified_flows),
-                    policy_proposed=None,
-                    enforcement_outcome=None,
-                    canary_result=None,
-                    explanation=f"Policy candidate rejected by safety contract: {decision_record.explanation}",
-                )
-                self._outcomes.append(outcome)
-                return outcome
-
-            candidate_policy = decision_record.proposed_policy
-
-            # 5. Check deadband hysteresis
-            is_deadband, max_change = self.is_within_deadband(
-                candidate=candidate_policy, current=self.coordinator.last_known_good_policy
+            outcome = ControlStepOutcome(
+                step_index=step_idx,
+                action=ControlAction.FAILED,
+                timestamp_monotonic=now_mono,
+                wall_clock_time=now_wall,
+                decision_id=None,
+                capacity_estimate=None,
+                classified_flow_count=0,
+                policy_proposed=None,
+                enforcement_outcome=None,
+                canary_result=None,
+                explanation=f"Telemetry rejected: {err}",
             )
-            if is_deadband:
+            self._outcomes.append(outcome)
+            return outcome
+
+        self._last_window_end_time = telemetry.end_time_monotonic
+
+        # 2. Flow classification
+        classified_flows: List[Tuple[FlowMetadata, ClassificationResult]] = []
+        for flow in telemetry.flows:
+            res = self.classifier.classify(flow, current_time=now_mono)
+            classified_flows.append((flow, res))
+
+        # 3. Capacity estimation
+        cap_estimate = self.capacity_provider.get_capacity_estimate(now_mono)
+        if not cap_estimate.is_available:
+            outcome = ControlStepOutcome(
+                step_index=step_idx,
+                action=ControlAction.NOOP_CAPACITY_UNAVAILABLE,
+                timestamp_monotonic=now_mono,
+                wall_clock_time=now_wall,
+                decision_id=None,
+                capacity_estimate=cap_estimate,
+                classified_flow_count=len(classified_flows),
+                policy_proposed=None,
+                enforcement_outcome=None,
+                canary_result=None,
+                explanation="Capacity estimate unavailable; holding existing operational policy",
+            )
+            self._outcomes.append(outcome)
+            return outcome
+
+        # 4. Propose candidate policy
+        decision_record = self.engine.generate_candidate_policy(
+            classified_flows=classified_flows,
+            estimated_capacity_mbps=cap_estimate.capacity_mbps,
+            timestamp=now_mono,
+        )
+
+        if decision_record.state != PolicyState.VALIDATED or not decision_record.proposed_policy:
+            outcome = ControlStepOutcome(
+                step_index=step_idx,
+                action=ControlAction.REJECTED,
+                timestamp_monotonic=now_mono,
+                wall_clock_time=now_wall,
+                decision_id=decision_record.decision_id,
+                capacity_estimate=cap_estimate,
+                classified_flow_count=len(classified_flows),
+                policy_proposed=None,
+                enforcement_outcome=None,
+                canary_result=None,
+                explanation=f"Policy candidate rejected by safety contract: {decision_record.explanation}",
+            )
+            self._outcomes.append(outcome)
+            return outcome
+
+        candidate_policy = decision_record.proposed_policy
+
+        # 5. Check deadband hysteresis
+        is_deadband, max_change = self.is_within_deadband(
+            candidate=candidate_policy, current=self.coordinator.last_known_good_policy
+        )
+        if is_deadband:
+            outcome = ControlStepOutcome(
+                step_index=step_idx,
+                action=ControlAction.NOOP_DEADBAND,
+                timestamp_monotonic=now_mono,
+                wall_clock_time=now_wall,
+                decision_id=decision_record.decision_id,
+                capacity_estimate=cap_estimate,
+                classified_flow_count=len(classified_flows),
+                policy_proposed=candidate_policy,
+                enforcement_outcome=None,
+                canary_result=None,
+                explanation=f"Change ({max_change}%) <= deadband threshold ({self.deadband_pct}%); apply suppressed",
+                details={"max_change_pct": max_change},
+            )
+            self._outcomes.append(outcome)
+            return outcome
+
+        # 6. Enforcement and kernel verification
+        active_record = decision_record
+        enf_outcome = None
+
+        already_enforcing = (
+            self.coordinator.state in (EnforcementState.ENFORCED, EnforcementState.CANARY_MONITORING)
+            and self.coordinator.current_record is not None
+            and self.coordinator.current_record.proposed_policy == candidate_policy
+        )
+
+        if already_enforcing:
+            # Policy is already active in kernel and undergoing canary monitoring;
+            # avoid redundant tc re-application during the canary window evaluation
+            active_record = self.coordinator.current_record
+        else:
+            self._canary_measurements = []
+            enf_outcome = self.coordinator.apply_and_verify(decision_record)
+            if not enf_outcome.success:
                 outcome = ControlStepOutcome(
                     step_index=step_idx,
-                    action=ControlAction.NOOP_DEADBAND,
+                    action=ControlAction.FAILED if enf_outcome.enforcement_state == EnforcementState.FAILED else ControlAction.ROLLED_BACK,
                     timestamp_monotonic=now_mono,
                     wall_clock_time=now_wall,
                     decision_id=decision_record.decision_id,
                     capacity_estimate=cap_estimate,
                     classified_flow_count=len(classified_flows),
                     policy_proposed=candidate_policy,
-                    enforcement_outcome=None,
+                    enforcement_outcome=enf_outcome,
                     canary_result=None,
-                    explanation=f"Change ({max_change}%) <= deadband threshold ({self.deadband_pct}%); apply suppressed",
-                    details={"max_change_pct": max_change},
+                    explanation=f"Enforcement failed: {enf_outcome.error_message}",
                 )
                 self._outcomes.append(outcome)
                 return outcome
 
-            # 6. Enforcement and kernel verification
-            active_record = decision_record
-            enf_outcome = None
+        # 7. Compute canary measurement from window packet telemetry
+        # Calculate raw, unclipped added delay, jitter, and loss
+        packet_records = list(telemetry.packet_records)
+        loss_pct = (
+            (telemetry.packets_sent - telemetry.packets_received) / telemetry.packets_sent * 100.0
+            if telemetry.packets_sent > 0
+            else 0.0
+        )
 
-            already_enforcing = (
-                self.coordinator.state in (EnforcementState.ENFORCED, EnforcementState.CANARY_MONITORING)
-                and self.coordinator.current_record is not None
-                and self.coordinator.current_record.proposed_policy == candidate_policy
+        if packet_records:
+            delays = [r.one_way_delay_ms for r in packet_records]
+            p95_delay = percentile(delays, 95.0)
+            # Raw, unclipped signed added delay
+            added_delay_ms = p95_delay - telemetry.baseline_delay_ms
+            jitter_ms = compute_rfc3550_jitter(packet_records)
+            canary_meas = CanaryMeasurement(
+                timestamp=telemetry.end_time_monotonic,
+                window_index=telemetry.window_index,
+                added_delay_ms=added_delay_ms,
+                jitter_ms=jitter_ms,
+                loss_pct=loss_pct,
+                valid=True,
+            )
+        else:
+            # Missing packet telemetry
+            canary_meas = CanaryMeasurement(
+                timestamp=telemetry.end_time_monotonic,
+                window_index=telemetry.window_index,
+                added_delay_ms=0.0,
+                jitter_ms=0.0,
+                loss_pct=loss_pct,
+                valid=False,
+                reason="No packet records received in window",
             )
 
-            if already_enforcing:
-                # Policy is already active in kernel and undergoing canary monitoring;
-                # avoid redundant tc re-application during the canary window evaluation
-                active_record = self.coordinator.current_record
-            else:
-                self._canary_measurements = []
-                enf_outcome = self.coordinator.apply_and_verify(decision_record)
-                if not enf_outcome.success:
-                    outcome = ControlStepOutcome(
-                        step_index=step_idx,
-                        action=ControlAction.FAILED if enf_outcome.enforcement_state == EnforcementState.FAILED else ControlAction.ROLLED_BACK,
-                        timestamp_monotonic=now_mono,
-                        wall_clock_time=now_wall,
-                        decision_id=decision_record.decision_id,
-                        capacity_estimate=cap_estimate,
-                        classified_flow_count=len(classified_flows),
-                        policy_proposed=candidate_policy,
-                        enforcement_outcome=enf_outcome,
-                        canary_result=None,
-                        explanation=f"Enforcement failed: {enf_outcome.error_message}",
-                    )
-                    self._outcomes.append(outcome)
-                    return outcome
+        # 8. Evaluate canary and commit baseline or rollback
+        self._canary_measurements.append(canary_meas)
+        canary_outcome = self.coordinator.canary_evaluate_and_commit(
+            active_record, self._canary_measurements
+        )
 
-            # 7. Compute canary measurement from window packet telemetry
-            # Calculate raw, unclipped added delay, jitter, and loss
-            packet_records = list(telemetry.packet_records)
-            loss_pct = (
-                (telemetry.packets_sent - telemetry.packets_received) / telemetry.packets_sent * 100.0
-                if telemetry.packets_sent > 0
-                else 0.0
-            )
+        if canary_outcome.enforcement_state == EnforcementState.ACCEPTED or canary_outcome.rollback_performed:
+            self._canary_measurements = []
 
-            if packet_records:
-                delays = [r.one_way_delay_ms for r in packet_records]
-                p95_delay = percentile(delays, 95.0)
-                # Raw, unclipped signed added delay
-                added_delay_ms = p95_delay - telemetry.baseline_delay_ms
-                jitter_ms = compute_rfc3550_jitter(packet_records)
-                canary_meas = CanaryMeasurement(
-                    timestamp=telemetry.end_time_monotonic,
-                    window_index=telemetry.window_index,
-                    added_delay_ms=added_delay_ms,
-                    jitter_ms=jitter_ms,
-                    loss_pct=loss_pct,
-                    valid=True,
-                )
-            else:
-                # Missing packet telemetry
-                canary_meas = CanaryMeasurement(
-                    timestamp=telemetry.end_time_monotonic,
-                    window_index=telemetry.window_index,
-                    added_delay_ms=0.0,
-                    jitter_ms=0.0,
-                    loss_pct=loss_pct,
-                    valid=False,
-                    reason="No packet records received in window",
-                )
+        if canary_outcome.success and canary_outcome.enforcement_state == EnforcementState.ACCEPTED:
+            action = ControlAction.COMMITTED
+        elif canary_outcome.rollback_performed and canary_outcome.rollback_verified:
+            action = ControlAction.ROLLED_BACK
+        elif canary_outcome.enforcement_state in (EnforcementState.ENFORCED, EnforcementState.CANARY_MONITORING):
+            action = ControlAction.ENFORCED
+        else:
+            action = ControlAction.FAILED
 
-            # 8. Evaluate canary and commit baseline or rollback
-            self._canary_measurements.append(canary_meas)
-            canary_outcome = self.coordinator.canary_evaluate_and_commit(
-                active_record, self._canary_measurements
-            )
-
-            if canary_outcome.enforcement_state == EnforcementState.ACCEPTED or canary_outcome.rollback_performed:
-                self._canary_measurements = []
-
-            if canary_outcome.success and canary_outcome.enforcement_state == EnforcementState.ACCEPTED:
-                action = ControlAction.COMMITTED
-            elif canary_outcome.rollback_performed and canary_outcome.rollback_verified:
-                action = ControlAction.ROLLED_BACK
-            elif canary_outcome.enforcement_state in (EnforcementState.ENFORCED, EnforcementState.CANARY_MONITORING):
-                action = ControlAction.ENFORCED
-            else:
-                action = ControlAction.FAILED
-
-            canary_res = canary_outcome.details.get("canary_result")
-            outcome = ControlStepOutcome(
-                step_index=step_idx,
-                action=action,
-                timestamp_monotonic=now_mono,
-                wall_clock_time=now_wall,
-                decision_id=active_record.decision_id,
-                capacity_estimate=cap_estimate,
-                classified_flow_count=len(classified_flows),
-                policy_proposed=candidate_policy,
-                enforcement_outcome=canary_outcome,
-                canary_result=canary_res,
-                explanation=f"Control step completed with action {action.value}",
-                details={"added_delay_ms": canary_meas.added_delay_ms, "loss_pct": loss_pct},
-            )
-            self._outcomes.append(outcome)
-            return outcome
-
-        finally:
-            self._mutex.release()
+        canary_res = canary_outcome.details.get("canary_result")
+        outcome = ControlStepOutcome(
+            step_index=step_idx,
+            action=action,
+            timestamp_monotonic=now_mono,
+            wall_clock_time=now_wall,
+            decision_id=active_record.decision_id,
+            capacity_estimate=cap_estimate,
+            classified_flow_count=len(classified_flows),
+            policy_proposed=candidate_policy,
+            enforcement_outcome=canary_outcome,
+            canary_result=canary_res,
+            explanation=f"Control step completed with action {action.value}",
+            details={"added_delay_ms": canary_meas.added_delay_ms, "loss_pct": loss_pct},
+        )
+        self._outcomes.append(outcome)
+        return outcome

@@ -42,10 +42,10 @@ const DECK_SLIDES: SlideItem[] = [
     ],
     rightTitle: 'Verified Empirical Results',
     rightBullets: [
-      'VoIP Call p95 Added Delay: 142.4 ms (FIFO) → 2.4 ms (FairFlow) — 98.3% reduction.',
+      'Smoke Benchmark (smoke_20261029_174600): R0 p99 added delay 197.98 ms → 1.51 ms with B2a fq_codel (~130× lower; 88.17 Mbps goodput).',
       'Pre-Apply Safety Gate (Layer 1): 100% of starvation policies blocked in < 1 ms (0.0 s impact).',
-      'Canary Rollback (Layer 2): 4.0 s breach detection (2 windows) & 0.42 s verified kernel recovery.',
-      'Dynamic ISP Drop (100 → 20 Mbps): Re-anchors shaping to 19.0 Mbps in 1 step; call delay 4.1 ms.',
+      'Canary Rollback (Layer 2 / S3): 4.0 s breach detection (2 windows) & 0.18 s verified kernel recovery.',
+      'Dynamic ISP Drop (S2, 100 → 20 Mbps): Call p95 stays 15.96 ms → 16.2 ms (< 80 ms guardrail).',
     ],
     footerHighlight:
       'One-Command Run: npm start  |  Docker Hub: nayan2406/fairflow:latest  |  GitHub: nayanjain24/fairflow',
@@ -162,7 +162,7 @@ const DECK_SLIDES: SlideItem[] = [
       'Catches policies that pass static math (e.g., valid floors but pfifo qdisc) yet cause latency spikes under bursty traffic.',
       'Monitors live p95 added delay, jitter, and loss across 5 windows (10 s).',
       'After 2 consecutive breached windows (4.0 s at 92 ms > 80 ms guardrail), atomically restores pol_v1_baseline via tc -batch.',
-      'Reads back kernel state via tc -j qdisc show to verify recovery in 0.42 s.',
+      'Reads back kernel state via tc -j qdisc show to verify recovery in 0.18 s.',
     ],
     footerHighlight:
       'Every ACCEPTED, REJECTED, and ROLLED_BACK decision produces a downloadable Markdown Policy Evaluation Report.',
@@ -200,20 +200,20 @@ const DECK_SLIDES: SlideItem[] = [
       'Comparative benchmarks against Unmanaged FIFO (R0_no_qos) and Static QoS (B1_static_htb) using real iperf3 + 50 pps UDP call probes.',
     leftTitle: 'Scenario A (100 Mbps) & Scenario B (20 Mbps Drop)',
     leftBullets: [
-      'Scenario A (VoIP + 4-Stream TCP Flood at 100 Mbps): Unmanaged FIFO p95 delay = 142.4 ms (jitter 28.5 ms). FairFlow p95 delay = 2.4 ms (jitter 0.9 ms, 0% loss).',
-      'Scenario B (Mid-Call ISP Drop 100 → 20 Mbps): Static QoS fails (shapes at 95 Mbps on a 20 Mbps link → 185 ms delay).',
-      'FairFlow detects capacity drop, re-anchors HTB root to 19.0 Mbps in 1 step, and restores VoIP p95 delay to 4.1 ms.',
+      'S1 Smoke Run (smoke_20261029_174600, 2 trials/arm): R0 no QoS p99 = 197.98 ms (0/2 met ≤ 30 ms, 95.32 Mbps); B1 static HTB = 36.46 ms (1/2 met); B2a fq_codel = 1.51 ms (2/2 met, 88.17 Mbps); B2b cake = 1.56 ms (2/2 met, 87.24 Mbps).',
+      'S2 Capacity Collapse (100 → 20 Mbps): Static QoS fails to track bottleneck; FairFlow re-anchors shaping within contract bounds (full 10-trial matrix planned next).',
+      'S2 Measured Result: Call p95 remains 15.96 ms before drop and 16.2 ms after adaptation (well below 80 ms guardrail).',
     ],
     rightTitle: 'Scenario C (Busy Household Multi-Stream)',
     rightBullets: [
       'Workload: 1 VoIP Call + 1 Gaming UDP stream + 3× 4K TV Streams (25 Mbps) + Bulk TCP download on 100 Mbps link.',
-      'Unmanaged FIFO: Call/Game jitter exceeds 35 ms; 4K streams suffer periodic buffer underruns.',
-      "FairFlow: Call & Game p95 delay kept at 2.8 ms; 3× 4K TV streams receive steady 25.2 Mbps; Bulk TCP utilizes remaining 66.8 Mbps (Jain's Fairness 0.96).",
+      'Unshaped shared link stalls real-time flows and causes uneven bandwidth starvation across concurrent video streams.',
+      "S4 Household Fairness: 3× streams achieve balanced 8.73 / 7.85 / 8.21 Mbps (Jain's Fairness 0.9981 ≥ 0.85); gaming p95 one-way delay held at 44.73 ms (15 ms base path).",
     ],
     footerHighlight:
       'All SLA targets met: Interactive p95 Added Delay < 30 ms, Jitter < 10 ms, Loss < 0.5% across all scenarios.',
     speakerNote:
-      'Highlight Scenario B: static QoS completely breaks when ISP speed drops from 100 to 20 Mbps, whereas FairFlow adapts to 19.0 Mbps and keeps delay at 4.1 ms.',
+      'Highlight S1 smoke results (197.98 ms → 1.51 ms), S2 capacity adaptation (15.96 → 16.2 ms), and S4 Jain Fairness 0.9981; note clearly that 10-trial block-randomized sweeps remain planned.',
   },
   {
     num: 9,
@@ -225,7 +225,7 @@ const DECK_SLIDES: SlideItem[] = [
     leftBullets: [
       'Fault S3 (Starvation Policy — 0.5 Mbps Floor): Blocked immediately by Layer 1 Pre-Apply Gate. Detection: 0.0 s | Recovery: 0.0 s | Impact: Zero.',
       'Fault S1 (Bad pfifo Leaf Policy Under Flood): Passes static floor check, spikes live p95 delay to 92.0 ms (> 80 ms guardrail).',
-      'Canary detects breach in 2 windows (4.0 s) and rolls back to pol_v1_baseline in 0.42 s (verified via tc -j qdisc show).',
+      'S3 Canary Drill: Detects breach in 2 windows (4.0 s) and rolls back to pol_v1_baseline in 0.18 s (verified via tc -j qdisc show).',
     ],
     rightTitle: 'Misclassification & Auditability',
     rightBullets: [
@@ -234,7 +234,7 @@ const DECK_SLIDES: SlideItem[] = [
       'One-Click Reset & Clear Data: Restores clean 100 Mbps baseline (pol_v1_baseline) for repeatable judge testing.',
     ],
     footerHighlight:
-      'Scorecard: S1 Canary Rollback PASS (4.0s / 0.42s)  |  S2 Misclassification PASS  |  S3 Starvation Gate Reject PASS (0.0s)',
+      'Scorecard: S3 Pre-Apply Gate Reject PASS (0.50 < 2.00 Mbps)  |  Canary Rollback PASS (4.0s / 0.18s)  |  S4 Jain Fairness 0.9981',
     speakerNote:
       'Show that all three fault injection drills (S1, S2, S3) are reproducible on demand in the Scenario Lab and Guided Judge Demo.',
   },

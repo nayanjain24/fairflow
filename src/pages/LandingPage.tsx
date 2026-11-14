@@ -24,6 +24,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { TiltCard } from '../components/TiltCard';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useReducedMotion, useShouldUseStatic3DFallback } from '../hooks/useReducedMotion';
 import { useDiskReports } from '../hooks/useFairFlowData';
 
@@ -279,19 +280,21 @@ export const LandingPage: React.FC = () => {
 
         {/* Hero 3D Scene */}
         <div className="mt-12">
-          <Suspense
-            fallback={
-              <div className="h-[380px] sm:h-[430px] w-full rounded-glass border border-[var(--line)] bg-[#090724] flex items-center justify-center font-mono text-xs text-[var(--mute)]">
-                Initializing 3D network link visualization...
-              </div>
-            }
-          >
-            <LazyNetworkLinkScene
-              metrics={{ mode: 'story-loop', scrollProgress }}
-              fallback={static3DFallback}
-              className="h-[380px] sm:h-[430px] w-full shadow-glass"
-            />
-          </Suspense>
+          <ErrorBoundary variant="inline" fallbackTitle="3D network visualization unavailable">
+            <Suspense
+              fallback={
+                <div className="h-[380px] sm:h-[430px] w-full rounded-glass border border-[var(--line)] bg-[#090724] flex items-center justify-center font-mono text-xs text-[var(--mute)]">
+                  Initializing 3D network link visualization...
+                </div>
+              }
+            >
+              <LazyNetworkLinkScene
+                metrics={{ mode: 'story-loop', scrollProgress }}
+                fallback={static3DFallback}
+                className="h-[380px] sm:h-[430px] w-full shadow-glass"
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </section>
 

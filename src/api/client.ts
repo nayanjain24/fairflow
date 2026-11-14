@@ -20,6 +20,7 @@ import {
   REAL_DISK_REPORTS,
   getMockHealth,
   getMockKernelQdisc,
+  exportMockRouterScript,
   getMockStatus,
   getMockTelemetryHistory,
   mockStore,
@@ -428,6 +429,31 @@ export const apiClient = {
       return getMockKernelQdisc();
     } catch {
       return getMockKernelQdisc();
+    }
+  },
+
+  async exportRouterScript(params: {
+    target: 'linux_tc' | 'openwrt_sqm';
+    wan_iface: string;
+    lan_iface: string;
+  }): Promise<import('./types').RouterScriptExportResponse> {
+    if (isUsingMock()) {
+      return exportMockRouterScript(params.target, params.wan_iface, params.lan_iface);
+    }
+    const qs = new URLSearchParams({
+      target: params.target,
+      wan_iface: params.wan_iface,
+      lan_iface: params.lan_iface,
+    }).toString();
+    try {
+      return await fetchJson<import('./types').RouterScriptExportResponse>(
+        `/api/v1/enforce/export-script?${qs}`
+      );
+    } catch (err) {
+      if (isStaticCloudHost || (err instanceof Error && err.message.startsWith('API 404'))) {
+        return exportMockRouterScript(params.target, params.wan_iface, params.lan_iface);
+      }
+      throw err;
     }
   },
 

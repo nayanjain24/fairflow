@@ -15,8 +15,18 @@ import {
   TelemetryRecord,
 } from './types';
 
+export interface MockRouterScriptParams {
+  target: 'linux_tc' | 'openwrt_sqm';
+  wan_iface: string;
+  lan_iface: string;
+}
+
+export const CONTRACT_SHA256 = '04893b27e604b38cd0fb0e6267b307d2f05447fcde333fd73f1743b9d5a499a8';
+
 export const MOCK_CONTRACT: ContractData = {
   version: 1,
+  sha256: CONTRACT_SHA256,
+  integrity_verified: true,
   measurement_window_s: 2,
   interactive: {
     added_delay_target_ms: 30,
@@ -564,10 +574,13 @@ export function getMockHealth(): HealthResponse {
     version: '1.0.0',
     vm_connected: true,
     controller_enabled: mockStore.controllerEnabled,
+    contract_verified: true,
+    contract_sha256: CONTRACT_SHA256,
   };
 }
 
 export function getMockStatus(): StatusResponse {
+  const usableMbps = Number((mockStore.capacityMbps * 0.95).toFixed(1));
   return {
     controller_enabled: mockStore.controllerEnabled,
     interface: 'ff_r_lan',
@@ -575,11 +588,11 @@ export function getMockStatus(): StatusResponse {
     enforcement_state: mockStore.enforcementState,
     active_policy_id: mockStore.activePolicyId,
     active_policy: {
-      link_capacity_mbps: Number((mockStore.capacityMbps * 0.95).toFixed(1)),
+      link_capacity_mbps: usableMbps,
       classes: [
-        { name: 'interactive', rate_mbps: 95.0, floor_mbps: 2.0, ceil_mbps: 95.0, priority: 1, leaf_qdisc: 'fq_codel' },
-        { name: 'streaming', rate_mbps: 95.0, floor_mbps: 8.0, ceil_mbps: 95.0, priority: 2, leaf_qdisc: 'fq_codel' },
-        { name: 'bulk', rate_mbps: 95.0, floor_mbps: 2.0, ceil_mbps: 95.0, priority: 3, leaf_qdisc: 'fq_codel' },
+        { name: 'interactive', rate_mbps: usableMbps, floor_mbps: 2.0, ceil_mbps: usableMbps, priority: 1, leaf_qdisc: 'fq_codel' },
+        { name: 'streaming', rate_mbps: usableMbps, floor_mbps: 8.0, ceil_mbps: usableMbps, priority: 2, leaf_qdisc: 'fq_codel' },
+        { name: 'bulk', rate_mbps: usableMbps, floor_mbps: 2.0, ceil_mbps: usableMbps, priority: 3, leaf_qdisc: 'fq_codel' },
       ],
     },
     capacity_estimate_mbps: mockStore.capacityMbps,
@@ -590,6 +603,30 @@ export function getMockStatus(): StatusResponse {
       timestamp_wall: Date.now() / 1000,
     },
     timestamp: Date.now() / 1000,
+    contract_sha256: CONTRACT_SHA256,
+    contract_verified: true,
+    canary_watchdog_armed: false,
+    overhead: {
+      steps_evaluated: mockStore.stepIndex,
+      last_step_wall_ms: 0.42,
+      avg_step_wall_ms: 0.39,
+      max_step_wall_ms: 0.85,
+      last_step_cpu_ms: 0.31,
+      avg_step_cpu_ms: 0.28,
+      process_rss_mb: 64.2,
+      gate_rejections: 1,
+      deadband_suppressions: 2,
+      canary_rollbacks: 1,
+      commits: Math.max(1, mockStore.stepIndex - 4),
+    },
+    estimator: {
+      capacity_mbps: mockStore.capacityMbps,
+      source: 'adaptive_telemetry_estimator',
+      confidence: 0.96,
+      uncertainty_mbps: Number((mockStore.capacityMbps * 0.02).toFixed(2)),
+      mae_mbps: 1.4,
+      reason: `Calibrated bottleneck capacity (${mockStore.capacityMbps.toFixed(1)} Mbps)`,
+    },
   };
 }
 
@@ -958,6 +995,89 @@ export function getMockKernelQdisc() {
       },
     ],
     timestamp: Date.now() / 1000,
+  };
+}
+
+export function exportMockRouterScript(
+  target: 'linux_tc' | 'openwrt_sqm',
+  wanIface = 'eth0',
+  lanIface = 'br-lan'
+) {
+  const usable = Number((mockStore.capacityMbps * 0.95).toFixed(2));
+  const safeWan = wanIface.replace(/[^a-zA-Z0-9._-]/g, '') || 'eth0';
+  const safeLan = lanIface.replace(/[^a-zA-Z0-9._-]/g, '') || 'br-lan';
+  const filename = `fairflow_pilot_${target}.sh`;
+
+  if (target === 'openwrt_sqm') {
+    const downKbps = Math.max(1000, Math.round(usable * 1000));
+    const script = [
+      '#!/bin/sh',
+      '# FairFlow Hardware Pilot — OpenWrt SQM/UCI QoS Profile (Read-Only Export)',
+      `# Active Contract SHA-256: ${CONTRACT_SHA256}`,
+      `# Shaped Downstream Ceiling: ${usable.toFixed(2)} Mbps (${downKbps} kbit/s)`,
+      'set -eu',
+      '',
+      'uci -q delete sqm.fairflow_pilot || true',
+      'uci set sqm.fairflow_pilot=queue',
+      `uci set sqm.fairflow_pilot.interface='${safeWan}'`,
+      `uci set sqm.fairflow_pilot.download='${downKbps}'`,
+      `uci set sqm.fairflow_pilot.upload='${Math.max(1000, Math.round(downKbps * 0.5))}'`,
+      "uci set sqm.fairflow_pilot.qdisc='cake'",
+      "uci set sqm.fairflow_pilot.script='layer_cake.qos'",
+      "uci set sqm.fairflow_pilot.qdisc_advanced='1'",
+      "uci set sqm.fairflow_pilot.squash_dscp='0'",
+      "uci set sqm.fairflow_pilot.squash_ingress='0'",
+      "uci set sqm.fairflow_pilot.iqdisc_opts='nat dual-dsthost diffserv4'",
+      "uci set sqm.fairflow_pilot.eqdisc_opts='nat dual-srchost diffserv4 ack-filter'",
+      "uci set sqm.fairflow_pilot.enabled='1'",
+      'uci commit sqm',
+      '/etc/init.d/sqm restart',
+      '',
+      `tc -s qdisc show dev ${safeWan}`,
+    ].join('\n') + '\n';
+    return {
+      target,
+      wan_iface: safeWan,
+      lan_iface: safeLan,
+      filename,
+      contract_sha256: CONTRACT_SHA256,
+      contract_verified: true,
+      script,
+    };
+  }
+
+  const script = [
+    '#!/usr/bin/env bash',
+    '# FairFlow Hardware Pilot — Linux Router HTB + Leaf Qdisc Script (Read-Only Export)',
+    `# Active Contract SHA-256: ${CONTRACT_SHA256}`,
+    `# Shaped Bottleneck Capacity: ${usable.toFixed(2)} Mbps | LAN=${safeLan} | WAN=${safeWan}`,
+    'set -euo pipefail',
+    '',
+    `LAN_IF="${safeLan}"`,
+    `WAN_IF="${safeWan}"`,
+    'IFB_IF="ifb0"',
+    '',
+    'tc qdisc del dev "$LAN_IF" root 2>/dev/null || true',
+    'tc qdisc del dev "$WAN_IF" ingress 2>/dev/null || true',
+    'tc qdisc replace dev "$LAN_IF" root handle 1: htb default 30',
+    `tc class replace dev "$LAN_IF" parent 1: classid 1:1 htb rate ${usable.toFixed(1)}Mbit ceil ${usable.toFixed(1)}Mbit`,
+    `tc class replace dev "$LAN_IF" parent 1:1 classid 1:10 htb rate 2.0Mbit ceil ${usable.toFixed(1)}Mbit prio 1`,
+    'tc qdisc replace dev "$LAN_IF" parent 1:10 handle 100: fq_codel',
+    `tc class replace dev "$LAN_IF" parent 1:1 classid 1:20 htb rate 8.0Mbit ceil ${usable.toFixed(1)}Mbit prio 2`,
+    'tc qdisc replace dev "$LAN_IF" parent 1:20 handle 200: fq_codel',
+    `tc class replace dev "$LAN_IF" parent 1:1 classid 1:30 htb rate 2.0Mbit ceil ${usable.toFixed(1)}Mbit prio 3`,
+    'tc qdisc replace dev "$LAN_IF" parent 1:30 handle 300: fq_codel',
+    'tc filter add dev "$LAN_IF" parent 1: protocol ip prio 2 u32 match ip tos 0xb8 0xfc flowid 1:10',
+    'tc -s -j qdisc show dev "$LAN_IF"',
+  ].join('\n') + '\n';
+  return {
+    target,
+    wan_iface: safeWan,
+    lan_iface: safeLan,
+    filename,
+    contract_sha256: CONTRACT_SHA256,
+    contract_verified: true,
+    script,
   };
 }
 

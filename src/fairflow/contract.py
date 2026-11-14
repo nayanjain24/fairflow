@@ -26,9 +26,10 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional, Union
 
 # Minimum link capacity used in Scenario B.  Floors must be feasible here too.
 _SCENARIO_B_CAPACITY_MBPS: float = 20.0
@@ -278,3 +279,60 @@ def load_contract(path: str | Path) -> Contract:
         policy_deadband_pct=policy_deadband_pct,
         link_default_capacity_mbps=link_default_capacity_mbps,
     )
+
+
+def compute_file_sha256(path: Union[str, Path]) -> str:
+    """Return lowercase hexadecimal SHA-256 digest of a file."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def get_contract_integrity(
+    contract_path: Union[str, Path] = "contract.yaml",
+    sha_path: Union[str, Path] = "contract.sha256",
+) -> Dict[str, Any]:
+    """Check contract.yaml SHA-256 digest against contract.sha256 without raising on missing checksum."""
+    c_file = Path(contract_path)
+    s_file = Path(sha_path)
+    if not c_file.exists():
+        return {
+            "sha256": None,
+            "expected_sha256": None,
+            "verified": False,
+            "error": f"Contract file missing: {c_file}",
+        }
+
+    actual = compute_file_sha256(c_file)
+    if not s_file.exists():
+        return {
+            "sha256": actual,
+            "expected_sha256": None,
+            "verified": False,
+            "error": f"Checksum file missing: {s_file}",
+        }
+
+    raw_expected = s_file.read_text(encoding="utf-8").strip()
+    expected = raw_expected.split()[0].lower() if raw_expected else ""
+    verified = bool(expected) and actual == expected
+    return {
+        "sha256": actual,
+        "expected_sha256": expected or None,
+        "verified": verified,
+        "error": None if verified else f"SHA-256 mismatch (expected {expected}, got {actual})",
+    }
+
+
+def verify_contract_sha256(
+    contract_path: Union[str, Path] = "contract.yaml",
+    sha_path: Union[str, Path] = "contract.sha256",
+) -> str:
+    """Strictly verify contract.yaml matches contract.sha256; raise if missing or mismatched."""
+    c_file = Path(contract_path)
+    s_file = Path(sha_path)
+    if not c_file.exists() or not s_file.exists():
+        raise FileNotFoundError("contract.yaml or contract.sha256 missing")
+    status = get_contract_integrity(c_file, s_file)
+    if not status["verified"]:
+        raise ValueError(
+            f"contract.yaml SHA256 mismatch: expected {status['expected_sha256']}, got {status['sha256']}"
+        )
+    return str(status["sha256"])

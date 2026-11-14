@@ -18,6 +18,20 @@ from typing import List, Dict, Any, Optional, Protocol, Sequence
 from src.fairflow.policy import Policy
 
 
+_ROUTER_IFACE_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,14}$")
+
+
+def validate_router_interface_name(interface: str) -> str:
+    """Validate POSIX netdev interface syntax for read-only router script export."""
+    if not isinstance(interface, str):
+        raise TypeError(f"Router interface name must be a string, got {type(interface).__name__}")
+    if ".." in interface or not _ROUTER_IFACE_PATTERN.match(interface):
+        raise ValueError(
+            f"Router interface name must match '^[a-zA-Z0-9][a-zA-Z0-9._-]{{0,14}}$': {interface!r}"
+        )
+    return interface
+
+
 def validate_interface_name(interface: str) -> str:
     """Validate that the network interface follows the required 'ff_' naming convention.
 
@@ -557,3 +571,116 @@ class TCDriver:
 
         commands.extend(filter_cmds)
         return commands
+
+    @classmethod
+    def export_router_script(
+        cls,
+        policy: Policy,
+        target: str = "linux_tc",
+        wan_iface: str = "eth0",
+        lan_iface: str = "br-lan",
+        contract_sha256: Optional[str] = None,
+    ) -> str:
+        """Render a standalone read-only hardware-pilot QoS deployment script (never executes locally)."""
+        wan = validate_router_interface_name(wan_iface)
+        lan = validate_router_interface_name(lan_iface)
+        digest = contract_sha256 or "unverified"
+        cap_mbps = round(float(policy.link_capacity_mbps), 2)
+
+        if target == "openwrt_sqm":
+            down_kbps = max(1000, int(round(cap_mbps * 1000)))
+            interactive = policy.classes.get("interactive")
+            leaf = (interactive.leaf_qdisc if interactive else None) or "cake"
+            lines = [
+                "#!/bin/sh",
+                "# FairFlow Hardware Pilot — OpenWrt SQM/UCI QoS Profile (Read-Only Export)",
+                f"# Active Contract SHA-256: {digest}",
+                f"# Shaped Downstream Ceiling: {cap_mbps:.2f} Mbps ({down_kbps} kbit/s)",
+                "set -eu",
+                "",
+                "uci -q delete sqm.fairflow_pilot || true",
+                "uci set sqm.fairflow_pilot=queue",
+                f"uci set sqm.fairflow_pilot.interface='{wan}'",
+                f"uci set sqm.fairflow_pilot.download='{down_kbps}'",
+                f"uci set sqm.fairflow_pilot.upload='{max(1000, int(down_kbps * 0.5))}'",
+                f"uci set sqm.fairflow_pilot.qdisc='{leaf if leaf in ('cake', 'fq_codel') else 'cake'}'",
+                "uci set sqm.fairflow_pilot.script='layer_cake.qos'",
+                "uci set sqm.fairflow_pilot.qdisc_advanced='1'",
+                "uci set sqm.fairflow_pilot.squash_dscp='0'",
+                "uci set sqm.fairflow_pilot.squash_ingress='0'",
+                "uci set sqm.fairflow_pilot.ingress_ecn='ECN'",
+                "uci set sqm.fairflow_pilot.egress_ecn='NOECN'",
+                "uci set sqm.fairflow_pilot.iqdisc_opts='nat dual-dsthost diffserv4'",
+                "uci set sqm.fairflow_pilot.eqdisc_opts='nat dual-srchost diffserv4 ack-filter'",
+                "uci set sqm.fairflow_pilot.enabled='1'",
+                "uci commit sqm",
+                "/etc/init.d/sqm restart",
+                "",
+                "# Post-apply verification readback:",
+                f"tc -s qdisc show dev {wan}",
+                f"tc -s qdisc show dev ifb4{wan} || true",
+                f"# Rollback command: uci set sqm.fairflow_pilot.enabled='0' && uci commit sqm && /etc/init.d/sqm restart",
+            ]
+            return "\n".join(lines) + "\n"
+
+        if target != "linux_tc":
+            raise ValueError(f"Unsupported router export target: {target!r} (expected 'linux_tc' or 'openwrt_sqm')")
+
+        lines = [
+            "#!/usr/bin/env bash",
+            "# FairFlow Hardware Pilot — Linux Router HTB + Leaf Qdisc Script (Read-Only Export)",
+            f"# Active Contract SHA-256: {digest}",
+            f"# Shaped Bottleneck Capacity: {cap_mbps:.2f} Mbps | LAN={lan} | WAN={wan}",
+            "set -euo pipefail",
+            "",
+            f'LAN_IF="{lan}"',
+            f'WAN_IF="{wan}"',
+            'IFB_IF="ifb0"',
+            "",
+            "# 1. Clean previous root/ingress qdiscs (idempotent)",
+            'tc qdisc del dev "$LAN_IF" root 2>/dev/null || true',
+            'tc qdisc del dev "$WAN_IF" ingress 2>/dev/null || true',
+            "",
+            "# 2. Apply downstream HTB hierarchy + AQM leaf qdiscs on LAN interface",
+            'tc qdisc replace dev "$LAN_IF" root handle 1: htb default 30',
+            f'tc class replace dev "$LAN_IF" parent 1: classid 1:1 htb rate {cap_mbps:.1f}Mbit ceil {cap_mbps:.1f}Mbit',
+        ]
+        for class_name, class_pol in policy.classes.items():
+            class_id = cls.CLASS_IDS.get(class_name, 99)
+            leaf = class_pol.leaf_qdisc or "fq_codel"
+            lines.append(
+                f'tc class replace dev "$LAN_IF" parent 1:1 classid 1:{class_id} htb '
+                f"rate {class_pol.rate_floor_mbps:.1f}Mbit ceil {class_pol.rate_ceiling_mbps:.1f}Mbit "
+                f"prio {class_pol.priority}"
+            )
+            lines.append(
+                f'tc qdisc replace dev "$LAN_IF" parent 1:{class_id} handle {class_id}0: {leaf}'
+            )
+
+        lines.extend(
+            [
+                "",
+                "# 3. Zero-DPI L3/L4 classification filters (Interactive UDP/DSCP EF -> 1:10, Streaming -> 1:20)",
+                'for port in 5004 5005 27015; do',
+                '  tc filter add dev "$LAN_IF" parent 1: protocol ip prio 2 u32 match ip protocol 17 0xff match ip dport $port 0xffff flowid 1:10',
+                '  tc filter add dev "$LAN_IF" parent 1: protocol ip prio 2 u32 match ip protocol 17 0xff match ip sport $port 0xffff flowid 1:10',
+                "done",
+                'tc filter add dev "$LAN_IF" parent 1: protocol ip prio 2 u32 match ip tos 0xb8 0xfc flowid 1:10',
+                'for port in 1935 8080; do',
+                '  tc filter add dev "$LAN_IF" parent 1: protocol ip prio 3 u32 match ip protocol 6 0xff match ip dport $port 0xffff flowid 1:20',
+                '  tc filter add dev "$LAN_IF" parent 1: protocol ip prio 3 u32 match ip protocol 6 0xff match ip sport $port 0xffff flowid 1:20',
+                "done",
+                "",
+                "# 4. Optional IFB ingress mirror from WAN into IFB_IF",
+                "modprobe ifb numifbs=1 2>/dev/null || true",
+                'ip link set dev "$IFB_IF" up 2>/dev/null || true',
+                'tc qdisc replace dev "$WAN_IF" handle ffff: ingress',
+                'tc filter replace dev "$WAN_IF" parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev "$IFB_IF"',
+                "",
+                "# 5. Kernel readback verification & safe emergency rollback",
+                'tc -s -j qdisc show dev "$LAN_IF"',
+                'tc -s -j class show dev "$LAN_IF"',
+                '# Rollback: tc qdisc del dev "$LAN_IF" root && tc qdisc del dev "$WAN_IF" ingress',
+            ]
+        )
+        return "\n".join(lines) + "\n"

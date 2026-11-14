@@ -4,8 +4,10 @@ import {
   Activity,
   AlertOctagon,
   AlertTriangle,
+  Check,
   CheckCircle2,
   Clock,
+  Copy,
   Cpu,
   Download,
   FileText,
@@ -36,6 +38,9 @@ import {
   useTelemetryHistory,
 } from '../hooks/useFairFlowData';
 import { LiveTelemetryCharts } from '../charts/LiveTelemetryCharts';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { apiClient } from '../api/client';
+import type { RouterScriptExportResponse } from '../api/types';
 import { useShouldUseStatic3DFallback } from '../hooks/useReducedMotion';
 
 const LazyNetworkLinkScene = lazy(() => import('../scene/NetworkLinkScene'));
@@ -89,6 +94,13 @@ export const DashboardPage: React.FC = () => {
   const [selectedQdisc, setSelectedQdisc] = useState<'fq_codel' | 'cake' | 'pfifo'>('fq_codel');
   const [simulateBreach, setSimulateBreach] = useState<boolean>(false);
   const [showRawKernelJson, setShowRawKernelJson] = useState<boolean>(false);
+  const [showRouterExport, setShowRouterExport] = useState<boolean>(false);
+  const [routerTarget, setRouterTarget] = useState<'linux_tc' | 'openwrt_sqm'>('linux_tc');
+  const [wanIface, setWanIface] = useState<string>('eth0');
+  const [lanIface, setLanIface] = useState<string>('br-lan');
+  const [exportedScript, setExportedScript] = useState<RouterScriptExportResponse | null>(null);
+  const [exportLoading, setExportLoading] = useState<boolean>(false);
+  const [scriptCopied, setScriptCopied] = useState<boolean>(false);
   const [guidedDemoStep, setGuidedDemoStep] = useState<{
     step: number;
     total: number;
@@ -606,9 +618,22 @@ export const DashboardPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           {/* Lifecycle State Pills */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[var(--mute)]">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono uppercase tracking-wider text-[var(--mute)]">
               <Activity className="h-3.5 w-3.5 text-[#7c5cff]" />
               <span>CONTROL LOOP STATE ({status?.namespace || 'ff_router'} : {status?.interface || 'ff_r_lan'})</span>
+              {(status?.contract_sha256 || contract?.sha256) && (
+                <span
+                  title={`Full contract.yaml SHA-256: ${status?.contract_sha256 || contract?.sha256}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${
+                    (status?.contract_verified ?? contract?.integrity_verified ?? true)
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                      : 'border-[#f26a1b]/50 bg-[#f26a1b]/15 text-[#f26a1b]'
+                  }`}
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                  CONTRACT {(status?.contract_sha256 || contract?.sha256 || '').slice(0, 10)}
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               {STATE_LIFECYCLE.map((st) => {
@@ -659,6 +684,36 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Controller Overhead & Estimator Accuracy Telemetry Strip */}
+        {(status?.overhead || status?.estimator) && (
+          <div className="mt-4 pt-4 border-t border-[var(--line)] grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+            <div className="rounded-xl bg-white/[0.02] border border-white/10 px-3.5 py-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-[var(--mute)]">STEP WALL / CPU</span>
+              <span className="text-white font-semibold">
+                {(status?.overhead?.last_step_wall_ms ?? 0).toFixed(2)} / {(status?.overhead?.last_step_cpu_ms ?? 0).toFixed(2)} ms
+              </span>
+            </div>
+            <div className="rounded-xl bg-white/[0.02] border border-white/10 px-3.5 py-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-[var(--mute)]">BACKEND RSS MEM</span>
+              <span className="text-[#b79bff] font-semibold">
+                {(status?.overhead?.process_rss_mb ?? 0).toFixed(1)} MiB
+              </span>
+            </div>
+            <div className="rounded-xl bg-white/[0.02] border border-white/10 px-3.5 py-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-[var(--mute)]">ESTIMATOR CONF</span>
+              <span className="text-emerald-300 font-semibold">
+                {Math.round((status?.estimator?.confidence ?? 0.96) * 100)}% (±{(status?.estimator?.uncertainty_mbps ?? 2.0).toFixed(1)}M)
+              </span>
+            </div>
+            <div className="rounded-xl bg-white/[0.02] border border-white/10 px-3.5 py-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-[var(--mute)]">GATE DECISIONS</span>
+              <span className="text-white font-semibold">
+                {status?.overhead?.commits ?? 0} ok • {status?.overhead?.gate_rejections ?? 0} rej • {status?.overhead?.canary_rollbacks ?? 0} rb
+              </span>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* INFEASIBILITY BANNER ("Honest when not") */}
@@ -958,24 +1013,26 @@ export const DashboardPage: React.FC = () => {
             </span>
           </div>
 
-          <Suspense
-            fallback={
-              <div className="h-[340px] w-full rounded-glass border border-[var(--line)] bg-[#090724] flex items-center justify-center font-mono text-xs text-[var(--mute)]">
-                Loading 3D link view...
-              </div>
-            }
-          >
-            <LazyNetworkLinkScene
-              metrics={{
-                mode: 'live',
-                queueFillPct: queueFillEstimate,
-                gateVerifying: activeLifecycleId === 'VERIFYING',
-                rollbackActive: activeLifecycleId === 'ROLLING_BACK',
-              }}
-              fallback={static3DFallback}
-              className="h-[340px] w-full"
-            />
-          </Suspense>
+          <ErrorBoundary variant="inline" fallbackTitle="3D live link view unavailable">
+            <Suspense
+              fallback={
+                <div className="h-[340px] w-full rounded-glass border border-[var(--line)] bg-[#090724] flex items-center justify-center font-mono text-xs text-[var(--mute)]">
+                  Loading 3D link view...
+                </div>
+              }
+            >
+              <LazyNetworkLinkScene
+                metrics={{
+                  mode: 'live',
+                  queueFillPct: queueFillEstimate,
+                  gateVerifying: activeLifecycleId === 'VERIFYING',
+                  rollbackActive: activeLifecycleId === 'ROLLING_BACK',
+                }}
+                fallback={static3DFallback}
+                className="h-[340px] w-full"
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         {/* Controller & Manual Policy Controls */}
@@ -1196,11 +1253,35 @@ export const DashboardPage: React.FC = () => {
             </h2>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 px-3 py-1 font-mono text-xs text-emerald-300">
               <ShieldCheck className="h-3.5 w-3.5" />
               {kernelQdisc?.linux_kernel_active ? 'LIVE LINUX KERNEL' : 'VERIFIED SNAPSHOT'}
             </span>
+            <button
+              type="button"
+              onClick={async () => {
+                const nextOpen = !showRouterExport;
+                setShowRouterExport(nextOpen);
+                if (nextOpen && !exportedScript) {
+                  setExportLoading(true);
+                  try {
+                    const res = await apiClient.exportRouterScript({
+                      target: routerTarget,
+                      wan_iface: wanIface,
+                      lan_iface: lanIface,
+                    });
+                    setExportedScript(res);
+                  } finally {
+                    setExportLoading(false);
+                  }
+                }
+              }}
+              className="btn-secondary !py-1.5 !px-3 !text-xs font-mono"
+            >
+              <Download className="h-3.5 w-3.5 text-[#b79bff]" />
+              {showRouterExport ? 'Hide pilot script' : 'Export router pilot script'}
+            </button>
             <button
               type="button"
               onClick={() => setShowRawKernelJson(!showRawKernelJson)}
@@ -1210,6 +1291,127 @@ export const DashboardPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Hardware Pilot Router Script Exporter (Linux tc / OpenWrt SQM) */}
+        {showRouterExport && (
+          <div className="rounded-2xl border border-[#7c5cff]/40 bg-[#080620]/95 p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="font-mono text-xs font-semibold text-[#b79bff] uppercase tracking-wider">
+                  Hardware Pilot Export • Read-Only Router Deployment Script
+                </div>
+                <p className="text-xs text-[var(--mute)] mt-0.5">
+                  Generates a stand-alone router script stamped with the active <code className="font-mono">contract.sha256</code> (never touches non-ff_* host interfaces locally).
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                <select
+                  aria-label="Router target format"
+                  value={routerTarget}
+                  onChange={async (e) => {
+                    const nextTarget = e.target.value as 'linux_tc' | 'openwrt_sqm';
+                    setRouterTarget(nextTarget);
+                    setExportLoading(true);
+                    try {
+                      setExportedScript(
+                        await apiClient.exportRouterScript({
+                          target: nextTarget,
+                          wan_iface: wanIface,
+                          lan_iface: lanIface,
+                        })
+                      );
+                    } finally {
+                      setExportLoading(false);
+                    }
+                  }}
+                  className="rounded-xl border border-[var(--line)] bg-[#06051a] px-2.5 py-1.5 text-white"
+                >
+                  <option value="linux_tc">Linux Router (HTB + tc)</option>
+                  <option value="openwrt_sqm">OpenWrt SQM (UCI + cake)</option>
+                </select>
+                <input
+                  type="text"
+                  aria-label="WAN interface name"
+                  value={wanIface}
+                  onChange={(e) => setWanIface(e.target.value)}
+                  placeholder="WAN (eth0)"
+                  className="w-24 rounded-xl border border-[var(--line)] bg-[#06051a] px-2.5 py-1.5 text-white"
+                />
+                <input
+                  type="text"
+                  aria-label="LAN interface name"
+                  value={lanIface}
+                  onChange={(e) => setLanIface(e.target.value)}
+                  placeholder="LAN (br-lan)"
+                  className="w-24 rounded-xl border border-[var(--line)] bg-[#06051a] px-2.5 py-1.5 text-white"
+                />
+                <button
+                  type="button"
+                  disabled={exportLoading}
+                  onClick={async () => {
+                    setExportLoading(true);
+                    try {
+                      setExportedScript(
+                        await apiClient.exportRouterScript({
+                          target: routerTarget,
+                          wan_iface: wanIface,
+                          lan_iface: lanIface,
+                        })
+                      );
+                    } catch (err) {
+                      setFeedbackBanner({
+                        type: 'error',
+                        message: err instanceof Error ? err.message : 'Invalid interface name for export',
+                      });
+                    } finally {
+                      setExportLoading(false);
+                    }
+                  }}
+                  className="btn-secondary !py-1.5 !px-3 !text-xs"
+                >
+                  {exportLoading ? 'Rendering...' : 'Refresh'}
+                </button>
+                {exportedScript && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(exportedScript.script);
+                        setScriptCopied(true);
+                        setTimeout(() => setScriptCopied(false), 1800);
+                      }}
+                      className="btn-secondary !py-1.5 !px-3 !text-xs"
+                    >
+                      {scriptCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      {scriptCopied ? 'Copied' : 'Copy'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const blob = new Blob([exportedScript.script], { type: 'text/x-shellscript;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = exportedScript.filename;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="btn-primary !py-1.5 !px-3 !text-xs"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download .sh
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {exportedScript && (
+              <pre className="rounded-xl border border-[var(--line)] bg-[#06051a] p-3 font-mono text-[11px] text-emerald-200 overflow-x-auto max-h-60">
+                {exportedScript.script}
+              </pre>
+            )}
+          </div>
+        )}
 
         {/* 3-Namespace Linux Testbed Architecture Diagram */}
         <div className="rounded-2xl border border-white/10 bg-[#080620]/90 p-4 font-mono text-xs">

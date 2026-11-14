@@ -54,7 +54,7 @@ jobs:
 
       - name: Run FairFlow unit & API test suite
         run: |
-          PYTHONPATH=. pytest -q tests/test_api.py tests/test_feasibility.py tests/test_classifier.py tests/test_dynamic_controller.py tests/test_store.py
+          PYTHONPATH=. pytest -q tests/test_api.py tests/test_feasibility.py tests/test_classifier.py tests/test_dynamic_controller.py tests/test_store.py tests/test_production_features.py
 
   build-and-push-docker:
     name: Build & Push Multi-Arch Docker Image

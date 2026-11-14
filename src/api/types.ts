@@ -4,6 +4,41 @@ export interface HealthResponse {
   version: string;
   vm_connected: boolean;
   controller_enabled: boolean;
+  contract_verified?: boolean;
+  contract_sha256?: string | null;
+}
+
+export interface OverheadMetrics {
+  steps_evaluated: number;
+  last_step_wall_ms: number;
+  avg_step_wall_ms: number;
+  max_step_wall_ms: number;
+  last_step_cpu_ms: number;
+  avg_step_cpu_ms: number;
+  process_rss_mb: number;
+  gate_rejections: number;
+  deadband_suppressions: number;
+  canary_rollbacks: number;
+  commits: number;
+}
+
+export interface EstimatorStatus {
+  capacity_mbps: number | null;
+  source: string;
+  confidence: number;
+  uncertainty_mbps: number;
+  mae_mbps: number | null;
+  reason?: string;
+}
+
+export interface RouterScriptExportResponse {
+  target: 'linux_tc' | 'openwrt_sqm';
+  wan_iface: string;
+  lan_iface: string;
+  filename: string;
+  contract_sha256: string | null;
+  contract_verified: boolean;
+  script: string;
 }
 
 export interface ClassPolicyItem {
@@ -37,6 +72,11 @@ export interface StatusResponse {
   capacity_estimate_mbps: number | null;
   last_step_outcome: StepOutcomeSummary | null;
   timestamp: number;
+  contract_sha256?: string | null;
+  contract_verified?: boolean;
+  canary_watchdog_armed?: boolean;
+  overhead?: OverheadMetrics | null;
+  estimator?: EstimatorStatus | null;
 }
 
 export interface TelemetryFlowSample {
@@ -186,6 +226,8 @@ export interface ClassifiedFlow {
 
 export interface ContractData {
   version: number;
+  sha256?: string | null;
+  integrity_verified?: boolean;
   measurement_window_s: number;
   interactive: {
     added_delay_target_ms: number;

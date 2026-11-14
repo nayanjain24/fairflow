@@ -23,17 +23,18 @@ import sys
 import threading
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
 
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.fairflow.store import AuditStore
-from src.fairflow.contract import load_contract, Contract
+from src.fairflow.contract import load_contract, get_contract_integrity, Contract
 from src.fairflow.policy import Policy, ClassPolicy
 from src.fairflow.feasibility import SafetyContractEngine
 from src.fairflow.controller import PolicyEngine, PolicyState
@@ -93,6 +94,8 @@ class HealthResponse(BaseModel):
     version: str = "1.0.0"
     vm_connected: bool
     controller_enabled: bool
+    contract_verified: bool = True
+    contract_sha256: Optional[str] = None
 
 
 class StatusResponse(BaseModel):
@@ -105,6 +108,11 @@ class StatusResponse(BaseModel):
     capacity_estimate_mbps: Optional[float] = None
     last_step_outcome: Optional[Dict[str, Any]] = None
     timestamp: float
+    contract_sha256: Optional[str] = None
+    contract_verified: bool = True
+    canary_watchdog_armed: bool = False
+    overhead: Optional[Dict[str, Any]] = None
+    estimator: Optional[Dict[str, Any]] = None
 
 
 class ClassPolicyModel(BaseModel):
@@ -248,19 +256,39 @@ def create_app(
     controller: Optional[DynamicController] = None,
     coordinator: Optional[EnforcementCoordinator] = None,
     job_manager: Optional[ExperimentJobManager] = None,
+    lkg_state_path: Optional[Union[str, Path]] = None,
 ) -> FastAPI:
     """Build and configure the FairFlow FastAPI backend application."""
+
+    stop_event = threading.Event()
+    cleanup_callbacks: List[Any] = []
+
+    @asynccontextmanager
+    async def app_lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+        try:
+            yield
+        finally:
+            stop_event.set()
+            for cb in cleanup_callbacks:
+                try:
+                    cb()
+                except Exception:
+                    pass
 
     app = FastAPI(
         title="FairFlow Adaptive QoS Backend API",
         version="1.0.0",
         description="Production REST API for FairFlow adaptive QoS control, policy generation, and kernel enforcement.",
+        lifespan=app_lifespan,
     )
 
+    raw_cors = os.getenv("FAIRFLOW_CORS_ORIGINS", "").strip()
+    cors_origins = [o.strip() for o in raw_cors.split(",") if o.strip()] if raw_cors else ["*"]
+    allow_creds = cors_origins != ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=cors_origins,
+        allow_credentials=allow_creds,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -269,9 +297,16 @@ def create_app(
     app_store = store or AuditStore("results/audit.db")
     app_job_manager = job_manager or ExperimentJobManager(app_store)
 
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    contract_file = repo_root / "contract.yaml"
+    if not contract_file.exists():
+        contract_file = Path("contract.yaml")
+    sha_file = contract_file.with_suffix(".sha256")
+    contract_integrity = get_contract_integrity(contract_file, sha_file)
+
     # Contract & Safety Engine
     try:
-        app_contract = load_contract("contract.yaml")
+        app_contract = load_contract(str(contract_file))
     except Exception:
         app_contract = None
 
@@ -399,8 +434,149 @@ def create_app(
         except Exception:
             return False
 
-    # TODO: Thin adapter bootstrap: Seed initial baseline policy and sync on-disk experiment artifacts
-    if store is None and app_controller.coordinator.last_known_good_policy is None:
+    # Production LKG Persistence & Non-Blocking Canary Lease Watchdog
+    resolved_lkg_path: Optional[Path] = (
+        Path(lkg_state_path)
+        if lkg_state_path is not None
+        else ((repo_root / "results" / "lkg_state.json") if is_production_runtime else None)
+    )
+    active_policy_id_holder: List[Optional[str]] = [None]
+    watchdog_lock = threading.Lock()
+    watchdog_timer_ref: List[Optional[threading.Timer]] = [None]
+    watchdog_armed_flag: List[bool] = [False]
+    watchdog_target_policy: List[Optional[str]] = [None]
+
+    def _serialize_policy(policy: Policy, policy_id: Optional[str] = None) -> Dict[str, Any]:
+        return {
+            "policy_id": policy_id or "pol_lkg",
+            "saved_at": time.time(),
+            "contract_sha256": contract_integrity.get("sha256"),
+            "link_capacity_mbps": float(policy.link_capacity_mbps),
+            "classes": {
+                name: {
+                    "rate_floor_mbps": float(cp.rate_floor_mbps),
+                    "rate_ceiling_mbps": float(cp.rate_ceiling_mbps),
+                    "priority": int(cp.priority),
+                    "leaf_qdisc": str(cp.leaf_qdisc),
+                }
+                for name, cp in policy.classes.items()
+            },
+        }
+
+    def _save_lkg_state(policy: Policy, policy_id: str) -> None:
+        if resolved_lkg_path is None:
+            return
+        try:
+            resolved_lkg_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_file = resolved_lkg_path.with_suffix(".tmp")
+            tmp_file.write_text(json.dumps(_serialize_policy(policy, policy_id), indent=2), encoding="utf-8")
+            os.replace(tmp_file, resolved_lkg_path)
+        except Exception:
+            pass
+
+    def _clear_lkg_state() -> None:
+        if resolved_lkg_path is None:
+            return
+        try:
+            if resolved_lkg_path.exists():
+                resolved_lkg_path.unlink()
+        except Exception:
+            pass
+
+    def _load_lkg_state() -> Optional[Tuple[Policy, str]]:
+        if resolved_lkg_path is None or not resolved_lkg_path.exists():
+            return None
+        try:
+            payload = json.loads(resolved_lkg_path.read_text(encoding="utf-8"))
+            raw_classes = payload.get("classes") or {}
+            classes_obj = {
+                cname: ClassPolicy(
+                    rate_floor_mbps=float(cdata["rate_floor_mbps"]),
+                    rate_ceiling_mbps=float(cdata["rate_ceiling_mbps"]),
+                    priority=int(cdata["priority"]),
+                    leaf_qdisc=str(cdata.get("leaf_qdisc") or "fq_codel"),
+                )
+                for cname, cdata in raw_classes.items()
+            }
+            if not classes_obj:
+                return None
+            restored = Policy(link_capacity_mbps=float(payload["link_capacity_mbps"]), classes=classes_obj)
+            check = safety_engine.evaluate(
+                restored,
+                estimated_capacity_mbps=restored.link_capacity_mbps,
+                current_policy=None,
+                capacity_is_raw=False,
+            )
+            if not check.is_feasible:
+                return None
+            return restored, str(payload.get("policy_id") or "pol_lkg_restored")
+        except Exception:
+            return None
+
+    def _disarm_canary_watchdog() -> None:
+        with watchdog_lock:
+            timer = watchdog_timer_ref[0]
+            if timer is not None:
+                timer.cancel()
+                watchdog_timer_ref[0] = None
+            watchdog_armed_flag[0] = False
+            watchdog_target_policy[0] = None
+
+    def _arm_canary_watchdog(policy_id: str, fallback_policy: Optional[Policy], timeout_s: float) -> None:
+        _disarm_canary_watchdog()
+
+        def _on_lease_expired() -> None:
+            with watchdog_lock:
+                still_armed = watchdog_armed_flag[0] and watchdog_target_policy[0] == policy_id
+                watchdog_armed_flag[0] = False
+                watchdog_timer_ref[0] = None
+            if not still_armed:
+                return
+            if app_controller.coordinator.state == EnforcementState.CANARY_MONITORING:
+                try:
+                    tc_driver.rollback(
+                        interface=app_coordinator.interface,
+                        namespace=app_coordinator.namespace,
+                        target_policy=fallback_policy,
+                    )
+                except Exception:
+                    pass
+                app_controller.coordinator.state = EnforcementState.ROLLED_BACK
+                app_controller.record_external_decision("ROLLED_BACK")
+                try:
+                    app_store.record_event(
+                        "CANARY_WATCHDOG_TIMEOUT",
+                        {"policy_id": policy_id, "timeout_s": timeout_s},
+                        summary=f"Canary lease expired after {timeout_s:.1f}s for {policy_id}; fail-closed rollback executed.",
+                    )
+                except Exception:
+                    pass
+
+        timer = threading.Timer(max(0.2, float(timeout_s)), _on_lease_expired)
+        timer.daemon = True
+        with watchdog_lock:
+            watchdog_timer_ref[0] = timer
+            watchdog_armed_flag[0] = True
+            watchdog_target_policy[0] = policy_id
+        timer.start()
+
+    cleanup_callbacks.append(_disarm_canary_watchdog)
+    cleanup_callbacks.append(app_store.close)
+
+    # Restore persisted LKG baseline if available; otherwise seed verified initial baseline
+    restored_lkg = _load_lkg_state()
+    if restored_lkg is not None and app_controller.coordinator.last_known_good_policy is None:
+        app_controller.coordinator.last_known_good_policy = restored_lkg[0]
+        app_controller.coordinator.state = EnforcementState.ACCEPTED
+        active_policy_id_holder[0] = restored_lkg[1]
+        app_store.record_event(
+            "LKG_STATE_RECOVERED",
+            {"policy_id": restored_lkg[1], "contract_sha256": contract_integrity.get("sha256")},
+            summary=f"Recovered verified Last-Known-Good policy '{restored_lkg[1]}' from disk.",
+        )
+        if can_use_linux_kernel:
+            ensure_live_testbed_up()
+    elif store is None and app_controller.coordinator.last_known_good_policy is None:
         initial_baseline = Policy(
             link_capacity_mbps=95.0,
             classes={
@@ -411,6 +587,7 @@ def create_app(
         )
         app_controller.coordinator.last_known_good_policy = initial_baseline
         app_controller.coordinator.state = EnforcementState.ACCEPTED
+        active_policy_id_holder[0] = "pol_v1_baseline"
         if can_use_linux_kernel:
             ensure_live_testbed_up()
 
@@ -513,18 +690,45 @@ def create_app(
 
     @app.get("/api/v1/health", response_model=HealthResponse, tags=["System"])
     def get_health() -> HealthResponse:
-        """Check system health, controller status, and VM execution status."""
-        # Simple VM connection probe if runner is real
+        """Check system health, controller status, and contract integrity."""
         vm_connected = True
         return HealthResponse(
-            status="healthy",
+            status="healthy" if app_contract is not None else "degraded",
             vm_connected=vm_connected,
             controller_enabled=is_enabled_flag[0],
+            contract_verified=bool(contract_integrity.get("verified")),
+            contract_sha256=contract_integrity.get("sha256"),
         )
+
+    @app.get("/api/v1/health/live", tags=["System"])
+    def get_liveness_probe() -> Dict[str, Any]:
+        """Kubernetes/container liveness probe."""
+        return {"status": "alive", "timestamp": time.time()}
+
+    @app.get("/api/v1/health/ready", tags=["System"])
+    def get_readiness_probe(response: Response) -> Dict[str, Any]:
+        """Readiness probe verifying contract load, checksum verification, and SQLite audit store."""
+        db_ok = True
+        try:
+            app_store.list_policies(limit=1)
+        except Exception:
+            db_ok = False
+        contract_loaded = app_contract is not None
+        ready = db_ok and contract_loaded
+        if not ready:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "ready" if ready else "not_ready",
+            "contract_loaded": contract_loaded,
+            "contract_verified": bool(contract_integrity.get("verified")),
+            "contract_sha256": contract_integrity.get("sha256"),
+            "store_ready": db_ok,
+            "timestamp": time.time(),
+        }
 
     @app.get("/api/v1/status", response_model=StatusResponse, tags=["System"])
     def get_status() -> StatusResponse:
-        """Get comprehensive controller, enforcement, and capacity status."""
+        """Get comprehensive controller, enforcement, overhead, and capacity status."""
         active_pol = app_controller.coordinator.last_known_good_policy
         active_pol_dict = None
         if active_pol:
@@ -544,6 +748,8 @@ def create_app(
             }
 
         cap_est = app_controller.capacity_provider.get_capacity_estimate(time.monotonic())
+        overhead_snapshot = app_controller.get_overhead_metrics()
+        estimator_snapshot = overhead_snapshot.pop("estimator", None)
 
         outcome_dict = None
         outcomes = app_controller.list_outcomes()
@@ -564,7 +770,7 @@ def create_app(
         decision_id = (
             app_controller.coordinator.current_record.decision_id
             if app_controller.coordinator.current_record
-            else None
+            else active_policy_id_holder[0]
         )
 
         return StatusResponse(
@@ -577,6 +783,80 @@ def create_app(
             capacity_estimate_mbps=cap_est.capacity_mbps if cap_est.is_available else None,
             last_step_outcome=outcome_dict,
             timestamp=time.time(),
+            contract_sha256=contract_integrity.get("sha256"),
+            contract_verified=bool(contract_integrity.get("verified")),
+            canary_watchdog_armed=bool(watchdog_armed_flag[0]),
+            overhead=overhead_snapshot,
+            estimator=estimator_snapshot,
+        )
+
+    @app.get("/api/v1/metrics/overhead", tags=["Telemetry"])
+    def get_controller_overhead() -> Dict[str, Any]:
+        """Expose controller execution latency, CPU cost, RSS memory, and estimator accuracy."""
+        metrics = app_controller.get_overhead_metrics()
+        metrics["contract_sha256"] = contract_integrity.get("sha256")
+        metrics["contract_verified"] = bool(contract_integrity.get("verified"))
+        metrics["timestamp"] = time.time()
+        return metrics
+
+    @app.get("/metrics", tags=["System"])
+    def get_prometheus_metrics() -> PlainTextResponse:
+        """Export FairFlow operational and overhead gauges in Prometheus text exposition format."""
+        metrics = app_controller.get_overhead_metrics()
+        est = metrics.get("estimator", {})
+        latest_tel = app_store.get_latest_telemetry() or {}
+        lines = [
+            "# HELP fairflow_controller_enabled Whether adaptive QoS control loop is enabled (1=yes, 0=no).",
+            "# TYPE fairflow_controller_enabled gauge",
+            f"fairflow_controller_enabled {1 if is_enabled_flag[0] else 0}",
+            "# HELP fairflow_contract_verified Whether contract.yaml matches contract.sha256 (1=yes, 0=no).",
+            "# TYPE fairflow_contract_verified gauge",
+            f"fairflow_contract_verified {1 if contract_integrity.get('verified') else 0}",
+            "# HELP fairflow_controller_steps_total Total control steps and policy gate decisions evaluated.",
+            "# TYPE fairflow_controller_steps_total counter",
+            f"fairflow_controller_steps_total {metrics['steps_evaluated']}",
+            "# HELP fairflow_gate_rejections_total Policies blocked by Pre-Apply Safety Contract Gate.",
+            "# TYPE fairflow_gate_rejections_total counter",
+            f"fairflow_gate_rejections_total {metrics['gate_rejections']}",
+            "# HELP fairflow_canary_rollbacks_total Policies automatically rolled back after canary breach.",
+            "# TYPE fairflow_canary_rollbacks_total counter",
+            f"fairflow_canary_rollbacks_total {metrics['canary_rollbacks']}",
+            "# HELP fairflow_step_wall_ms Most recent control step wall-clock duration in milliseconds.",
+            "# TYPE fairflow_step_wall_ms gauge",
+            f"fairflow_step_wall_ms {metrics['last_step_wall_ms']}",
+            "# HELP fairflow_step_cpu_ms Most recent control step CPU time in milliseconds.",
+            "# TYPE fairflow_step_cpu_ms gauge",
+            f"fairflow_step_cpu_ms {metrics['last_step_cpu_ms']}",
+            "# HELP fairflow_process_rss_mb Resident set size memory footprint of backend process in MiB.",
+            "# TYPE fairflow_process_rss_mb gauge",
+            f"fairflow_process_rss_mb {metrics['process_rss_mb']}",
+            "# HELP fairflow_estimator_confidence Capacity estimator confidence score [0-1].",
+            "# TYPE fairflow_estimator_confidence gauge",
+            f"fairflow_estimator_confidence {est.get('confidence', 0.0)}",
+            "# HELP fairflow_estimator_uncertainty_mbps Capacity estimator uncertainty bound in Mbps.",
+            "# TYPE fairflow_estimator_uncertainty_mbps gauge",
+            f"fairflow_estimator_uncertainty_mbps {est.get('uncertainty_mbps', 0.0)}",
+        ]
+        if est.get("capacity_mbps") is not None:
+            lines.extend([
+                "# HELP fairflow_link_capacity_mbps Current estimated link bottleneck capacity in Mbps.",
+                "# TYPE fairflow_link_capacity_mbps gauge",
+                f"fairflow_link_capacity_mbps {est['capacity_mbps']}",
+            ])
+        for src_key, metric_name in (
+            ("rtt_ms", "fairflow_rtt_ms"),
+            ("p95_latency_ms", "fairflow_p95_latency_ms"),
+            ("jitter_ms", "fairflow_jitter_ms"),
+            ("packet_loss_pct", "fairflow_packet_loss_pct"),
+            ("throughput_mbps", "fairflow_throughput_mbps"),
+        ):
+            val = latest_tel.get(src_key)
+            if val is not None:
+                lines.append(f"# TYPE {metric_name} gauge")
+                lines.append(f"{metric_name} {val}")
+        return PlainTextResponse(
+            content="\n".join(lines) + "\n",
+            media_type="text/plain; version=0.0.4; charset=utf-8",
         )
 
     @app.get("/api/v1/telemetry/latest", tags=["Telemetry"])
@@ -799,6 +1079,19 @@ def create_app(
                     "rollback_performed": outcome.enforcement_outcome.rollback_performed,
                 }
 
+            if app_controller.coordinator.state == EnforcementState.CANARY_MONITORING:
+                _arm_canary_watchdog(
+                    outcome.decision_id or "canary_pending",
+                    app_controller.coordinator.last_known_good_policy,
+                    (app_contract.canary_duration_s if app_contract else 10.0) + 2.0,
+                )
+            elif action_str in ("COMMITTED", "ROLLED_BACK", "FAILED", "REJECTED"):
+                _disarm_canary_watchdog()
+                if action_str == "COMMITTED" and app_controller.coordinator.last_known_good_policy:
+                    committed_id = outcome.decision_id or f"pol_step_{outcome.step_index}"
+                    active_policy_id_holder[0] = committed_id
+                    _save_lkg_state(app_controller.coordinator.last_known_good_policy, committed_id)
+
             app_store.record_event(
                 "CONTROLLER_EVALUATED",
                 {
@@ -905,13 +1198,15 @@ def create_app(
     # results/ artifacts) without inventing fake numbers.
     # -------------------------------------------------------------------------
 
-    @app.get("/api/v1/contract", tags=["Adapter (TODO)"])
+    @app.get("/api/v1/contract", tags=["Contract"])
     def get_contract_adapter() -> Dict[str, Any]:
-        """TODO: Thin adapter exposing contract.yaml thresholds and guardrails."""
+        """Expose active contract.yaml thresholds, guardrails, and verified SHA-256 digest."""
         if not app_contract:
             raise HTTPException(status_code=404, detail="contract.yaml could not be loaded")
         return {
             "version": 1,
+            "sha256": contract_integrity.get("sha256"),
+            "integrity_verified": bool(contract_integrity.get("verified")),
             "measurement_window_s": app_contract.measurement_window_s,
             "interactive": {
                 "added_delay_target_ms": app_contract.interactive_added_delay_target_ms,
@@ -1149,11 +1444,24 @@ def create_app(
         )
         return {"capacity_mbps": req.capacity_mbps, "is_available": req.is_available}
 
-    @app.post("/api/v1/policies/propose", tags=["Adapter (TODO)"])
+    @app.post("/api/v1/policies/propose", tags=["Policies"])
     def propose_and_enforce_policy(req: PolicyProposeRequest) -> Dict[str, Any]:
-        """TODO: Thin adapter to propose a candidate policy through Pre-Apply Gate, Apply, Canary, and Verified Rollback."""
+        """Propose a candidate policy through Pre-Apply Gate, Apply, Canary, and Verified Rollback."""
+        t_wall_start = time.perf_counter()
+        t_cpu_start = time.process_time()
         now = time.time()
         policy_id = f"pol_{int(now)}_{uuid.uuid4().hex[:6]}"
+        contract_sha = contract_integrity.get("sha256") or "unavailable"
+        contract_ver_str = "VERIFIED" if contract_integrity.get("verified") else "UNVERIFIED"
+
+        def _finalize(payload: Dict[str, Any]) -> Dict[str, Any]:
+            app_controller.record_external_decision(
+                payload["verdict"],
+                wall_ms=(time.perf_counter() - t_wall_start) * 1000.0,
+                cpu_ms=(time.process_time() - t_cpu_start) * 1000.0,
+            )
+            payload["contract_sha256"] = contract_sha
+            return payload
         classes_dict = {
             c.name: ClassPolicy(
                 rate_floor_mbps=c.floor_mbps,
@@ -1230,6 +1538,7 @@ def create_app(
             md_report = (
                 f"# FairFlow Policy Evaluation Report: {policy_id}\n"
                 f"- **Policy ID**: {policy_id}\n"
+                f"- **Contract SHA-256**: `{contract_sha}` ({contract_ver_str})\n"
                 f"- **Timestamp UTC**: {ts_iso}\n"
                 f"- **Verdict**: {verdict_str}\n"
                 f"- **Target Interface**: {app_coordinator.namespace}:{app_coordinator.interface}\n"
@@ -1249,7 +1558,6 @@ def create_app(
 
             if is_production_runtime:
                 try:
-                    repo_root = Path(__file__).resolve().parent.parent.parent
                     pol_dir = repo_root / "results" / "policy_reports" / policy_id
                     pol_dir.mkdir(parents=True, exist_ok=True)
                     (pol_dir / "report.md").write_text(md_report, encoding="utf-8")
@@ -1257,6 +1565,8 @@ def create_app(
                         json.dumps(
                             {
                                 "policy_id": policy_id,
+                                "contract_sha256": contract_sha,
+                                "contract_verified": bool(contract_integrity.get("verified")),
                                 "verdict": verdict_str,
                                 "gate_passed": gate_passed_bool,
                                 "canary_status": canary_str,
@@ -1302,7 +1612,7 @@ def create_app(
                 {"policy_id": policy_id, "reasons": list(feas.reasons), "usable_capacity_mbps": feas.usable_capacity_mbps},
                 summary=f"Pre-apply gate rejected {policy_id}: {reason_str}",
             )
-            return {
+            return _finalize({
                 "policy_id": policy_id,
                 "verdict": "REJECTED",
                 "gate_passed": False,
@@ -1313,7 +1623,7 @@ def create_app(
                 "usable_capacity_mbps": feas.usable_capacity_mbps,
                 "required_minimum_mbps": feas.required_minimum_mbps,
                 "report_markdown": report_md,
-            }
+            })
 
         # Passed pre-apply gate! Apply candidate to the Linux kernel and verify readback
         lkg_policy = app_controller.coordinator.last_known_good_policy
@@ -1364,6 +1674,7 @@ def create_app(
                 except Exception:
                     rollback_verified = False
             recover_time_s = max(0.01, round(time.monotonic() - t_rb_start, 3))
+            _disarm_canary_watchdog()
             app_controller.coordinator.state = EnforcementState.ROLLED_BACK
 
             breach_reason = "added_delay (92.0 ms) > guardrail (80.0 ms) across 2 consecutive canary windows"
@@ -1421,7 +1732,7 @@ def create_app(
                 },
                 summary=f"Rolled back {policy_id} on {app_coordinator.interface} after canary breach; kernel restoration verified in {recover_time_s}s",
             )
-            return {
+            return _finalize({
                 "policy_id": policy_id,
                 "verdict": "ROLLED_BACK",
                 "gate_passed": True,
@@ -1435,11 +1746,14 @@ def create_app(
                 "usable_capacity_mbps": feas.usable_capacity_mbps,
                 "required_minimum_mbps": feas.required_minimum_mbps,
                 "report_markdown": report_md,
-            }
+            })
 
         # Apply and commit as accepted
+        _disarm_canary_watchdog()
         app_controller.coordinator.last_known_good_policy = candidate
         app_controller.coordinator.state = EnforcementState.ACCEPTED
+        active_policy_id_holder[0] = policy_id
+        _save_lkg_state(candidate, policy_id)
         explanation_text = (
             f"Passed pre-apply safety gate, enforced on {app_coordinator.namespace}:{app_coordinator.interface} "
             f"(kernel_verified={kernel_applied}), and passed canary monitoring on {feas.usable_capacity_mbps:.1f} Mbps usable capacity."
@@ -1483,7 +1797,7 @@ def create_app(
             {"policy_id": policy_id, "allocations_mbps": feas.allocations_mbps, "kernel_verified": kernel_applied},
             summary=f"Policy {policy_id} enforced on {app_coordinator.interface}, passed canary, and committed as last-known-good",
         )
-        return {
+        return _finalize({
             "policy_id": policy_id,
             "verdict": "ACCEPTED",
             "gate_passed": True,
@@ -1498,7 +1812,7 @@ def create_app(
             "required_minimum_mbps": feas.required_minimum_mbps,
             "allocations_mbps": feas.allocations_mbps,
             "report_markdown": report_md,
-        }
+        })
 
     @app.get("/api/v1/reports", tags=["Adapter (TODO)"])
     def list_disk_reports() -> Dict[str, Any]:
@@ -1624,6 +1938,8 @@ def create_app(
                 pass
 
         # 5. Reset controller baseline policy to clean 95.0 Mbps verified state
+        _disarm_canary_watchdog()
+        _clear_lkg_state()
         now_reset = time.time()
         mono_reset = time.monotonic()
         clean_baseline = Policy(
@@ -1636,6 +1952,7 @@ def create_app(
         )
         app_controller.coordinator.last_known_good_policy = clean_baseline
         app_controller.coordinator.state = EnforcementState.ACCEPTED
+        active_policy_id_holder[0] = "pol_v1_baseline"
 
         if can_use_linux_kernel and ensure_live_testbed_up():
             try:
@@ -1703,6 +2020,59 @@ def create_app(
 
     active_traffic_procs: List[subprocess.Popen] = []
     traffic_lock = threading.Lock()
+
+    def _cleanup_traffic_procs() -> None:
+        with traffic_lock:
+            for p in active_traffic_procs:
+                if p.poll() is None:
+                    p.terminate()
+            active_traffic_procs.clear()
+
+    cleanup_callbacks.append(_cleanup_traffic_procs)
+
+    @app.get("/api/v1/enforce/export-script", tags=["Enforcement"])
+    def export_router_script_endpoint(
+        target: str = Query(default="linux_tc", pattern=r"^(linux_tc|openwrt_sqm)$"),
+        wan_iface: str = Query(default="eth0"),
+        lan_iface: str = Query(default="br-lan"),
+        download: bool = Query(default=False),
+    ) -> Any:
+        """Export a read-only hardware-pilot router script (Linux tc or OpenWrt SQM) for the active LKG policy."""
+        pol = app_controller.coordinator.last_known_good_policy or Policy(
+            link_capacity_mbps=95.0,
+            classes={
+                "interactive": ClassPolicy(rate_floor_mbps=2.0, rate_ceiling_mbps=95.0, priority=1, leaf_qdisc="fq_codel"),
+                "streaming": ClassPolicy(rate_floor_mbps=8.0, rate_ceiling_mbps=95.0, priority=2, leaf_qdisc="fq_codel"),
+                "bulk": ClassPolicy(rate_floor_mbps=2.0, rate_ceiling_mbps=95.0, priority=3, leaf_qdisc="fq_codel"),
+            },
+        )
+        try:
+            script_text = TCDriver.export_router_script(
+                policy=pol,
+                target=target,
+                wan_iface=wan_iface,
+                lan_iface=lan_iface,
+                contract_sha256=contract_integrity.get("sha256"),
+            )
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
+        filename = f"fairflow_pilot_{target}.sh"
+        if download:
+            return Response(
+                content=script_text,
+                media_type="text/x-shellscript; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        return {
+            "target": target,
+            "wan_iface": wan_iface,
+            "lan_iface": lan_iface,
+            "filename": filename,
+            "contract_sha256": contract_integrity.get("sha256"),
+            "contract_verified": bool(contract_integrity.get("verified")),
+            "script": script_text,
+        }
 
     @app.get("/api/v1/kernel/qdisc", tags=["System"])
     def get_live_kernel_qdisc() -> Dict[str, Any]:
@@ -1855,8 +2225,7 @@ def create_app(
     if is_production_runtime and can_use_linux_kernel:
         def _background_control_loop() -> None:
             window_s = app_contract.measurement_window_s if app_contract else 2.0
-            while True:
-                time.sleep(window_s)
+            while not stop_event.wait(timeout=window_s):
                 if not is_enabled_flag[0] or app_job_manager.has_active_jobs():
                     continue
                 try:

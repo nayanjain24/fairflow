@@ -11,6 +11,7 @@ RUN npm ci
 
 # Copy frontend source and configuration files
 COPY index.html postcss.config.js tailwind.config.js tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts ./
+COPY public ./public
 COPY src ./src
 
 # Build production static bundle (same-origin API on port 8000)

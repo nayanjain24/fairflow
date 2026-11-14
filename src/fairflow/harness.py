@@ -37,20 +37,13 @@ from src.fairflow.policy import Policy, ClassPolicy
 from src.fairflow.enforcement_coordinator import EnforcementCoordinator, EnforcementState, CanaryMeasurement
 from src.fairflow.controller import PolicyEngine, PolicyState
 from src.fairflow.feasibility import SafetyContractEngine
+from src.fairflow.contract import verify_contract_sha256
 from src.fairflow.enforce import TCDriver
 
 
 def verify_contract_integrity() -> str:
     """Verify that contract.yaml matches contract.sha256 exactly."""
-    contract_file = REPO_ROOT / "contract.yaml"
-    sha_file = REPO_ROOT / "contract.sha256"
-    if not contract_file.exists() or not sha_file.exists():
-        raise FileNotFoundError("contract.yaml or contract.sha256 missing")
-    expected = sha_file.read_text(encoding="utf-8").strip()
-    actual = hashlib.sha256(contract_file.read_bytes()).hexdigest()
-    if actual != expected:
-        raise ValueError(f"contract.yaml SHA256 mismatch: expected {expected}, got {actual}")
-    return actual
+    return verify_contract_sha256(REPO_ROOT / "contract.yaml", REPO_ROOT / "contract.sha256")
 
 
 def get_system_metadata() -> Dict[str, Any]:

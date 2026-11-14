@@ -199,10 +199,8 @@ def test_apply_failure_triggers_verified_rollback(
     # Snapshot succeeds (baseline empty)
     # Apply command fails
     # Rollback succeeds (deletes root qdisc)
-    call_count = 0
 
     def mock_run(cmd, check=True):
-        nonlocal call_count
         cmd_str = " ".join(cmd)
         runner.history.append(cmd)
         if "tc -j qdisc show" in cmd_str:

@@ -87,7 +87,6 @@ def test_integration_b1_traffic_classification_counters() -> None:
         import threading
         rx_records = []
         def _rx():
-            nonlocal rx_records
             # Execute in client namespace
             rx_proc = subprocess.run([
                 "ip", "netns", "exec", "ff_client",

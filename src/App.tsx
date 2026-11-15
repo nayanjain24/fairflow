@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Navbar, Footer } from './components/Layout';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -34,6 +35,7 @@ export function App() {
           </div>
           <Footer />
         </div>
+        <SpeedInsights />
       </BrowserRouter>
     </QueryClientProvider>
   );
